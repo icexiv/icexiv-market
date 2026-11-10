@@ -84,7 +84,7 @@ jobs:
       - name: Build
         run: bun run build
         env:
-          BASE_URL: /xiv-market/
+          BASE_URL: /icexiv-market/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
