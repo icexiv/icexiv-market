@@ -88,7 +88,8 @@ jobs:
       - name: Build international site
         run: bun run build
         env:
-          BASE_URL: /
+          # GitHub Pages 项目页地址是 /<仓库名>/，不能使用根路径。
+          BASE_URL: /icexiv-market/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
