@@ -192,7 +192,7 @@ export default function Home() {
   const [debouncedQuery, setDebouncedQuery] = createSignal(initialSearchQuery)
   const [isComposing, setIsComposing] = createSignal(false)
   const [page, setPage] = createSignal(1)
-  const PAGE_SIZE = 50
+  const PAGE_SIZE = 20
   let searchTimer: number | undefined
   onCleanup(() => window.clearTimeout(searchTimer))
 
