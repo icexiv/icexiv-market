@@ -131,7 +131,7 @@ jobs:
         run: |
           rsync -rlt --delete --delay-updates --chmod=D755,F644 \
             -e "ssh -i ~/.ssh/id_ed25519" \
-            dist/ azurice@82.156.196.54:/srv/market.icexiv.top/www/
+            dist/ deploy@82.156.196.54:/srv/market.icexiv.top/www/
 
   deploy:
     environment:
