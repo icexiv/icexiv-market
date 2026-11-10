@@ -1,6 +1,7 @@
 import { createEffect, createResource, createSignal, For, lazy, onMount, Show, Suspense } from 'solid-js'
 import { A } from '@solidjs/router'
 import { selectedRegion, setDataCenters, setWorlds, fetchDataCenters, fetchWorlds, errMessage, setWorldsLoadFailed } from '@xiv-market/shared'
+import { BuildCommitLink } from './build-badge'
 
 const RegionSelect = lazy(() => import('./region-select'))
 
@@ -137,6 +138,8 @@ export function Navbar(props: {
               </svg>
             </a>
           )}
+
+          <BuildCommitLink />
 
           <A
             href="/settings"

@@ -6,16 +6,19 @@ import solid from 'vite-plugin-solid'
 import tailwindcss from '@tailwindcss/vite'
 import { resolveSiteTarget } from './site-target'
 
-function getGitCommit() {
+function getGitInfo() {
   try {
-    return execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim()
+    const commit = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim()
+    const subject = execSync('git log -1 --format=%s', { encoding: 'utf-8' }).trim()
+    const date = execSync('git log -1 --format=%cI', { encoding: 'utf-8' }).trim()
+    return { commit, subject, date }
   } catch {
-    return 'unknown'
+    return { commit: 'unknown', subject: '', date: '' }
   }
 }
 
 const itemsSource = JSON.parse(readFileSync(new URL('./.generated/items-source.json', import.meta.url), 'utf-8'))
-const gitCommit = getGitCommit()
+const gitCommit = getGitInfo()
 const base = (process.env.BASE_URL || '/').replace(/\/?$/, '/')
 
 export default defineConfig(({ mode }) => {
@@ -43,7 +46,9 @@ export default defineConfig(({ mode }) => {
       ]),
       __ITEMS_SHA256__: JSON.stringify(itemsSource.sha256),
       __ITEMS_SIZE__: JSON.stringify(itemsSource.size),
-      __GIT_COMMIT__: JSON.stringify(gitCommit),
+      __GIT_COMMIT__: JSON.stringify(gitCommit.commit),
+      __GIT_COMMIT_SUBJECT__: JSON.stringify(gitCommit.subject),
+      __GIT_COMMIT_DATE__: JSON.stringify(gitCommit.date),
     },
     server: {
       proxy: {
