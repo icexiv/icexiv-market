@@ -111,9 +111,34 @@ bun run check-report
 
 ## 部署
 
-推送到 `main` 分支后，GitHub Actions 会自动构建并部署到 GitHub Pages。
+推送到 `main` 分支后，GitHub Actions 只构建国际站并部署到 GitHub Pages。服务器部署 job 和服务器产物上传暂时禁用；国内站需单独使用 `cn` 目标构建，不能复用国际站产物。
 
-生产地址为 `https://market.icexiv.top/`，部署使用 `BASE_URL=/`。物品数据的 SHA-256 校验依赖浏览器安全上下文，GitHub Pages 必须开启 Enforce HTTPS；使用又拍云 CDN 时，也需为加速域名配置证书并开启 HTTP 到 HTTPS 的跳转。
+- `https://market.icexiv.top/`：国内 NixOS 源站，Caddy 从 `/srv/market.icexiv.top/www` 提供静态文件。DNS 直接解析到源站，证书由 Caddy 自动申请；保留的服务器部署配置使用仓库 secrets `DEPLOY_SSH_KEY` 和 `DEPLOY_KNOWN_HOSTS` 通过 rsync 写入站点目录。
+- GitHub Pages：国际站，由当前 CI 自动部署。
+
+两处都使用 `BASE_URL=/`。物品数据的 SHA-256 校验依赖浏览器安全上下文，因此源站和 GitHub Pages 都必须启用 HTTPS。
+
+### 构建目标
+
+`VITE_SITE_TARGET` 控制部署差异，与页面选择的行情区域无关：
+
+- `global`（默认）：不显示 ICP / 公安备案页脚，供国际站使用。
+- `cn`：显示 `packages/ui/src/layout/site-footer.tsx` 中配置的备案信息，空的备案号不显示。
+- 其他值会使构建失败，避免拼写错误导致国内站遗漏备案信息。
+
+```bash
+# 国际站（CI 使用此配置）
+VITE_SITE_TARGET=global bun run build
+
+# 国内站（仅构建，CI 暂未启用部署）
+VITE_SITE_TARGET=cn bun run build
+```
+
+开发服务器同样支持该变量，也可通过 `app/.env.local` 等 Vite 环境文件配置。配置在构建时写入产物，不需要运行时请求或部署后修改 JS；截图入口不显示备案页脚。
+
+部署到 GitHub Pages 子目录时需设置对应的 `BASE_URL`。
+
+### 物品数据
 
 构建前会自动检查物品数据是否为最新版本，如果过旧会阻止部署，提示先运行 `bun run update-items` 和 `shadow publish` 更新、发布数据。
 
@@ -135,7 +160,7 @@ TOS 需允许 `https://market.icexiv.top` 和 `https://icexiv.github.io` 的跨�
 
 ### CDN 缓存
 
-部署完成后，工作流会用 `UPYUN_TOKEN` 刷新 `https://market.icexiv.top/` 和 `/index.html` 的又拍云缓存。HTML 沿用 GitHub 的 `max-age=600`，不刷新会使新版本最长延迟 10 分钟可见，而旧 HTML 引用的哈希资源可能已被替换。哈希资源与 `/items/` 保持不变，无需刷新。
+源站部署不经过又拍云，国际站的 GitHub Pages 部署也不刷新国内站 CDN。若国内站使用又拍云，可通过 `scripts/purge-cdn.ts` 刷新 `https://market.icexiv.top/` 和 `/index.html` 的缓存；HTML 应及时重新校验，哈希资源与 `/items/` 可长缓存，且应保留一段时间的旧哈希资源以支持已打开的页面。
 
 `UPYUN_TOKEN` 为又拍云开放 API 的 Token，scope 只需 `cache`。本地手动刷新：
 
@@ -143,7 +168,7 @@ TOS 需允许 `https://market.icexiv.top` 和 `https://icexiv.github.io` 的跨�
 UPYUN_TOKEN=your-token bun run purge-cdn
 ```
 
-未配置该 secret 时工作流跳过刷新并继续，不会让部署失败。
+未提供 Token 时脚本跳过刷新，不发送请求。
 
 ## License
 

@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy international site to GitHub Pages
 
 on:
   push:
@@ -50,6 +50,10 @@ jobs:
   build:
     needs: check-items
     runs-on: ubuntu-latest
+    env:
+      VITE_SITE_TARGET: global
+    outputs:
+      site-target: ${{ env.VITE_SITE_TARGET }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -81,7 +85,7 @@ jobs:
       - name: Test
         run: bun run test
 
-      - name: Build
+      - name: Build international site
         run: bun run build
         env:
           BASE_URL: /
@@ -92,6 +96,8 @@ jobs:
           path: app/dist
 
       - name: Upload server artifact
+        # 国内站需单独构建 cn 产物，不能复用当前的国际产物。
+        if: ${{ env.VITE_SITE_TARGET == 'cn' }}
         uses: actions/upload-artifact@v4
         with:
           name: site-dist
@@ -99,6 +105,8 @@ jobs:
           retention-days: 7
 
   deploy-server:
+    # 保留服务器部署配置，待国内构建接入后再启用。
+    if: ${{ needs.build.outputs.site-target == 'cn' }}
     runs-on: ubuntu-latest
     needs: build
     steps:
@@ -134,16 +142,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Purge CDN cache
-        env:
-          UPYUN_TOKEN: ${{ secrets.UPYUN_TOKEN }}
-        run: bun run scripts/purge-cdn.ts

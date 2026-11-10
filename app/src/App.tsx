@@ -39,8 +39,8 @@ function Layout(props: { children?: any }) {
           <ErrorBoundary>{props.children}</ErrorBoundary>
         </Show>
       </main>
-      {/* 备案号页脚：截图入口 render.tsx 不经过 Layout，不会污染报表截图 */}
-      <SiteFooter />
+      {/* 备案信息只属于国内部署，与行情区域选择无关；截图入口不经过 Layout */}
+      {import.meta.env.VITE_SITE_TARGET === 'cn' && <SiteFooter />}
       <AppToastRegion />
     </div>
   )
