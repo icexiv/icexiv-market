@@ -41,7 +41,7 @@ export default function Settings() {
                 <p class="text-sm text-muted-foreground mb-1">构建 Commit</p>
                 <p class="font-mono text-sm">
                   <a
-                    href={`https://github.com/AzurIce/xiv-market/commit/${__GIT_COMMIT__}`}
+                    href={`https://github.com/icexiv/icexiv-market/commit/${__GIT_COMMIT__}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     class="text-primary hover:underline"

@@ -54,6 +54,9 @@ export async function fetchJsonWithTimeout<T>(
     trace.readMs = performance.now() - readStart
     trace.bytes = bytes.byteLength
     if (options.sha256) {
+      if (!globalThis.crypto?.subtle) {
+        throw new Error('物品数据校验需要安全上下文，请使用 HTTPS 或 localhost 访问')
+      }
       const verifyStart = performance.now()
       const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), byte => byte.toString(16).padStart(2, '0')).join('')
       trace.verifyMs = performance.now() - verifyStart

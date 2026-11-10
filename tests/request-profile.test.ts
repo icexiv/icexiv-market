@@ -30,6 +30,17 @@ test('corrupt and invalid JSON responses are visible as failed requests', async 
   assert.equal(requestTraces().at(-1)?.status, 'error')
 })
 
+test('unavailable Web Crypto reports the HTTPS requirement without skipping verification', async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto')!
+  Object.defineProperty(globalThis, 'crypto', { configurable: true, value: {} })
+  try {
+    await assert.rejects(fetchJsonWithTimeout('data:application/json,%7B%7D', 'test', undefined, { sha256: '0'.repeat(64) }), /HTTPS/)
+    assert.equal(requestTraces().at(-1)?.status, 'error')
+  } finally {
+    Object.defineProperty(globalThis, 'crypto', descriptor)
+  }
+})
+
 test('cancellation includes stalled response bodies and records an aborted request', async () => {
   let received!: () => void
   const started = new Promise<void>(resolve => { received = resolve })

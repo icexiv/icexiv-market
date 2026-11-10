@@ -13,12 +13,12 @@ function fixture(run: (root: string, digest: string, bytes: string) => void, pre
   mkdirSync(join(root, '.shadow/refs/data'), { recursive: true })
   mkdirSync(join(root, 'data'))
   writeFileSync(join(root, 'shadow.toml'), `version = 1
-name = "xiv-market"
+name = "icexiv-market"
 [backend]
 type = "volcengine_tos"
 endpoint = "https://tos-cn-beijing.volces.com"
 region = "cn-beijing"
-bucket = "azurice-shadow"
+bucket = "icexiv-shadow"
 prefix = "${prefix}"
 `)
   writeFileSync(join(root, '.shadow/refs/data/items.json.ref'), `version = 1\noid = "sha256:${digest}"\nsize = ${Buffer.byteLength(bytes)}\n`)
@@ -29,7 +29,7 @@ prefix = "${prefix}"
 test('a fresh checkout builds a pinned TOS URL without restoring files or credentials', () => {
   fixture((root, digest) => {
     assert.deepEqual(getItemsSource(root), {
-      url: `https://azurice-shadow.tos-cn-beijing.volces.com/xiv-market/objects/sha256/${digest.slice(0, 2)}/${digest.slice(2)}`,
+      url: `https://icexiv-shadow.tos-cn-beijing.volces.com/icexiv-market/objects/sha256/${digest.slice(0, 2)}/${digest.slice(2)}`,
       sha256: digest,
       size: Buffer.byteLength('{"2":{"name":"火之碎晶","icon":20001}}'),
       commit: 'upstream',
@@ -40,7 +40,7 @@ test('a fresh checkout builds a pinned TOS URL without restoring files or creden
 
 test('the URL includes the configured storage prefix', () => {
   fixture((root) => {
-    assert.ok(getItemsSource(root).url.includes('/shadow/public/xiv-market/objects/sha256/'))
+    assert.ok(getItemsSource(root).url.includes('/shadow/public/icexiv-market/objects/sha256/'))
   }, 'shadow/public')
 })
 

@@ -23,7 +23,7 @@ bun run dev
 bun run build
 
 # 构建生产版本（指定 base 路径，如 GitHub Pages 子目录）
-BASE_URL=/xiv-market/ bun run build
+BASE_URL=/icexiv-market/ bun run build
 
 # 更新物品数据（CI/CD 使用）
 bun run update-items
@@ -114,7 +114,7 @@ app/
 
 1. **Git Submodule**（推荐）
    ```bash
-   git submodule add https://github.com/AzurIce/xiv-market.git external/xiv-market
+   git submodule add https://github.com/icexiv/icexiv-market.git external/icexiv-market
    ```
    然后在 `package.json` 中使用 `file:` 或 `workspace:*` 引用。
 

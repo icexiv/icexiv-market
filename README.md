@@ -64,7 +64,7 @@ Nix 包仍提供 `$out/items.json`，使用 ref 中的 SHA-256 从 TOS 固定获
 
 ## 网络诊断
 
-通过设置页的「打开网络诊断」或 `/#/debug`（子路径部署为 `/xiv-market/#/debug`）进入懒加载诊断页。
+通过设置页的「打开网络诊断」或 `/#/debug`（子路径部署为 `/icexiv-market/#/debug`）进入懒加载诊断页。
 
 - **Endpoint 测速**：手动测试两份物品数据、Universalis 数据中心 / 服务器 / 可交易物品列表，以及当前区域与指定物品 ID 的聚合行情、挂单、成交历史。支持正常缓存和绕过浏览器 HTTP 缓存，逐项执行，可停止；显示响应状态、等待、读取、大小和当前缓存模式下成功样本的中位数。
 - **请求 Profile**：记录最近 200 个应用 / 测速 JSON 请求的时间线，区分等待响应、读取响应、SHA-256 校验与 JSON 解析，可筛选、清空和查看单次详情。记录仅保存在当前文档内存中，不上传；命中应用 localStorage 缓存的操作不产生网络请求记录。
@@ -113,9 +113,11 @@ bun run check-report
 
 推送到 `main` 分支后，GitHub Actions 会自动构建并部署到 GitHub Pages。
 
+生产地址为 `https://market.icexiv.top/`，部署使用 `BASE_URL=/`。物品数据的 SHA-256 校验依赖浏览器安全上下文，GitHub Pages 必须开启 Enforce HTTPS；使用又拍云 CDN 时，也需为加速域名配置证书并开启 HTTP 到 HTTPS 的跳转。
+
 构建前会自动检查物品数据是否为最新版本，如果过旧会阻止部署，提示先运行 `bun run update-items` 和 `shadow publish` 更新、发布数据。
 
-Shadow 的 bucket、区域和项目命名空间配置在 `shadow.toml`。本地凭证放在被忽略的 `.env`：
+Shadow 的 bucket、区域和项目命名空间配置在 `shadow.toml`：使用北京区域的 `icexiv-shadow` 桶，命名空间为 `icexiv-market`。本地凭证放在被忽略的 `.env`：
 
 ```dotenv
 TOS_ACCESS_KEY=your-access-key
@@ -125,8 +127,8 @@ TOS_SECRET_KEY=your-secret-key
 
 GitHub Actions 使用同名 repository secrets；凭证只用于 Shadow，不注入前端。
 每次部署先 `shadow restore`、`shadow publish` 和远端校验，再检查 JSON 的公开读取、CORS、类型及内容哈希，成功后才构建。
-TOS 需允许 `https://azurice.github.io` 的跨域 GET/HEAD；本地开发另需允许 `http://localhost:*` 和 `http://127.0.0.1:*`。
-可运行 `bun run scripts/check-items-access.ts` 单独验证生产地址。
+TOS 需允许 `https://market.icexiv.top` 和 `https://icexiv.github.io` 的跨域 GET/HEAD；本地开发另需允许 `http://localhost:*` 和 `http://127.0.0.1:*`。
+可运行 `bun run scripts/check-items-access.ts` 单独验证生产域名的公开读取、CORS 和哈希。检查其他域名时设置 `ITEMS_ORIGIN`，例如 `ITEMS_ORIGIN=https://icexiv.github.io bun run scripts/check-items-access.ts`。
 
 定时更新流程每 15 分钟检查上游，有变化时生成 JSON、发布到 TOS，再提交 `.shadow/refs/data/items.json.ref` 和 `data/items-version.json` 并触发部署。
 手动更新后也应提交这两个文件。
