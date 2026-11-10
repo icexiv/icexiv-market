@@ -1,4 +1,4 @@
-name: Deploy international site to GitHub Pages
+name: Deploy sites
 
 on:
   push:
@@ -50,10 +50,6 @@ jobs:
   build:
     needs: check-items
     runs-on: ubuntu-latest
-    env:
-      VITE_SITE_TARGET: global
-    outputs:
-      site-target: ${{ env.VITE_SITE_TARGET }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,17 +84,22 @@ jobs:
       - name: Build international site
         run: bun run build
         env:
+          VITE_SITE_TARGET: global
           # GitHub Pages 项目页地址是 /<仓库名>/，不能使用根路径。
           BASE_URL: /icexiv-market/
 
-      - name: Upload artifact
+      - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist
 
+      - name: Build domestic site
+        run: bun run build
+        env:
+          VITE_SITE_TARGET: cn
+          BASE_URL: /
+
       - name: Upload server artifact
-        # 国内站需单独构建 cn 产物，不能复用当前的国际产物。
-        if: ${{ env.VITE_SITE_TARGET == 'cn' }}
         uses: actions/upload-artifact@v4
         with:
           name: site-dist
@@ -106,8 +107,7 @@ jobs:
           retention-days: 7
 
   deploy-server:
-    # 保留服务器部署配置，待国内构建接入后再启用。
-    if: ${{ needs.build.outputs.site-target == 'cn' }}
+    # 与 Pages 部署并行，两个 job 共用同一个 build 产物流程。
     runs-on: ubuntu-latest
     needs: build
     steps:

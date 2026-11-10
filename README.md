@@ -111,10 +111,10 @@ bun run check-report
 
 ## 部署
 
-推送到 `main` 分支后，GitHub Actions 只构建国际站并部署到 GitHub Pages。服务器部署 job 和服务器产物上传暂时禁用；国内站需单独使用 `cn` 目标构建，不能复用国际站产物。
+推送到 `main` 分支后，GitHub Actions 在一次依赖安装、测试和物品数据发布后连续构建两个产物，然后并行部署：
 
-- `https://market.icexiv.top/`：国内 NixOS 源站，Caddy 从 `/srv/market.icexiv.top/www` 提供静态文件。DNS 直接解析到源站，证书由 Caddy 自动申请；保留的服务器部署配置使用仓库 secrets `DEPLOY_SSH_KEY` 和 `DEPLOY_KNOWN_HOSTS` 通过 rsync 写入站点目录。
-- GitHub Pages：国际站，由当前 CI 自动部署。
+- `https://market.icexiv.top/`：国内 NixOS 源站，Caddy 从 `/srv/market.icexiv.top/www` 提供静态文件。DNS 直接解析到源站，证书由 Caddy 自动申请；部署使用仓库 secrets `DEPLOY_SSH_KEY` 和 `DEPLOY_KNOWN_HOSTS` 通过 rsync 写入站点目录。
+- `https://icexiv.github.io/icexiv-market/`：国际站，部署到 GitHub Pages。
 
 `BASE_URL` 按部署位置区分：源站为 `/`，GitHub Pages 项目页为 `/icexiv-market/`。物品数据的 SHA-256 校验依赖浏览器安全上下文，因此源站和 GitHub Pages 都必须启用 HTTPS。
 
@@ -127,11 +127,11 @@ bun run check-report
 - 其他值会使构建失败，避免拼写错误导致国内站遗漏备案信息。
 
 ```bash
-# 国际站（CI 使用此配置）
-VITE_SITE_TARGET=global bun run build
+# 国际站（CI 部署到 GitHub Pages）
+VITE_SITE_TARGET=global BASE_URL=/icexiv-market/ bun run build
 
-# 国内站（仅构建，CI 暂未启用部署）
-VITE_SITE_TARGET=cn bun run build
+# 国内站（CI 部署到 market.icexiv.top）
+VITE_SITE_TARGET=cn BASE_URL=/ bun run build
 ```
 
 开发服务器同样支持该变量，也可通过 `app/.env.local` 等 Vite 环境文件配置。配置在构建时写入产物，不需要运行时请求或部署后修改 JS；截图入口不显示备案页脚。

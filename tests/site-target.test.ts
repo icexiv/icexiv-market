@@ -24,6 +24,7 @@ interface Step {
   run?: string
   if?: string
   env?: Record<string, string>
+  with?: Record<string, string>
 }
 
 interface Job {
@@ -38,21 +39,33 @@ const workflow = YAML.parse(readFileSync(new URL('../.github/workflows/deploy.ym
   jobs: Record<string, Job>
 }
 
-test('Pages builds only the international target', () => {
-  const builds = Object.values(workflow.jobs).flatMap(job => job.steps)
-    .filter(step => step.run === 'bun run build')
-  assert.equal(builds.length, 1)
-  assert.equal(workflow.jobs.build.env?.VITE_SITE_TARGET, 'global')
-  assert.equal(builds[0].env?.VITE_SITE_TARGET, undefined)
-  assert.equal(workflow.jobs.build.outputs?.['site-target'], '${{ env.VITE_SITE_TARGET }}')
-  assert.equal(workflow.jobs.deploy.needs, 'build')
-  assert.ok(workflow.jobs.deploy.steps.some(step => step.uses?.startsWith('actions/deploy-pages@')))
+test('one build job produces both site targets', () => {
+  const builds = workflow.jobs.build.steps.filter(step => step.run === 'bun run build')
+  assert.equal(builds.length, 2)
+  assert.equal(builds[0].env?.VITE_SITE_TARGET, 'global')
+  assert.equal(builds[0].env?.BASE_URL, '/icexiv-market/')
+  assert.equal(builds[1].env?.VITE_SITE_TARGET, 'cn')
+  assert.equal(builds[1].env?.BASE_URL, '/')
+  assert.equal(workflow.jobs.build.outputs?.['site-target'], undefined)
 })
 
-test('international artifacts are not uploaded or deployed to the domestic server', () => {
-  assert.equal(workflow.jobs['deploy-server'].if, "${{ needs.build.outputs.site-target == 'cn' }}")
-  const serverUpload = workflow.jobs.build.steps.find(step => step.uses?.startsWith('actions/upload-artifact@'))
+test('both deployments run in parallel from the shared build', () => {
+  assert.equal(workflow.jobs.deploy.needs, 'build')
+  assert.equal(workflow.jobs['deploy-server'].needs, 'build')
+  assert.equal(workflow.jobs['deploy-server'].if, undefined)
+  assert.ok(workflow.jobs.deploy.steps.some(step =>
+    step.uses?.startsWith('actions/deploy-pages@')))
+  assert.ok(workflow.jobs['deploy-server'].steps.some(step =>
+    step.run?.includes('/srv/market.icexiv.top/www')))
+})
+
+test('domestic and international artifacts are uploaded separately', () => {
+  const pagesUpload = workflow.jobs.build.steps.find(step =>
+    step.uses?.startsWith('actions/upload-pages-artifact@'))
+  assert.ok(pagesUpload)
+  const serverUpload = workflow.jobs.build.steps.find(step =>
+    step.uses?.startsWith('actions/upload-artifact@') && step.with?.name === 'site-dist')
   assert.ok(serverUpload)
-  assert.equal(serverUpload.if, "${{ env.VITE_SITE_TARGET == 'cn' }}")
+  assert.equal(serverUpload.if, undefined)
   assert.ok(!workflow.jobs.deploy.steps.some(step => step.run?.includes('purge-cdn')))
 })
