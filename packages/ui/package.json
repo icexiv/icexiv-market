@@ -14,6 +14,10 @@
       "types": "./src/layout/navbar.tsx",
       "default": "./src/layout/navbar.tsx"
     },
+    "./site-footer": {
+      "types": "./src/layout/site-footer.tsx",
+      "default": "./src/layout/site-footer.tsx"
+    },
     "./pages/home": {
       "types": "./src/pages/home.tsx",
       "default": "./src/pages/home.tsx"

@@ -6,6 +6,7 @@ import { AppToastRegion } from '@xiv-market/ui/toast'
 import { ErrorBoundary } from '@xiv-market/ui/error-boundary'
 // Navbar 静态导入：体积小，且 lazy 化时其 chunk 失败不在任何边界内（未处理渲染错误）
 import { Navbar } from '@xiv-market/ui/navbar'
+import { SiteFooter } from '@xiv-market/ui/site-footer'
 
 const HomePage = lazy(() => import('@xiv-market/ui/pages/home'))
 const MateriaPage = lazy(() => import('@xiv-market/ui/pages/materia'))
@@ -38,6 +39,8 @@ function Layout(props: { children?: any }) {
           <ErrorBoundary>{props.children}</ErrorBoundary>
         </Show>
       </main>
+      {/* 备案号页脚：截图入口 render.tsx 不经过 Layout，不会污染报表截图 */}
+      <SiteFooter />
       <AppToastRegion />
     </div>
   )
