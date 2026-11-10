@@ -101,3 +101,13 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Purge CDN cache
+        env:
+          UPYUN_TOKEN: ${{ secrets.UPYUN_TOKEN }}
+        run: bun run scripts/purge-cdn.ts

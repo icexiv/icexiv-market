@@ -12,6 +12,7 @@
     "build": "bun run --cwd app build",
     "preview": "bun run --cwd app preview",
     "update-items": "bun run scripts/update-items.ts",
+    "purge-cdn": "bun run scripts/purge-cdn.ts",
     "test": "bun test tests/*.test.ts",
     "check-report": "bun scripts/check-item-report.ts",
     "check-render-ready": "bun scripts/check-render-ready.ts"

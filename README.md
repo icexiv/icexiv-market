@@ -133,6 +133,18 @@ TOS 需允许 `https://market.icexiv.top` 和 `https://icexiv.github.io` 的跨�
 定时更新流程每 15 分钟检查上游，有变化时生成 JSON、发布到 TOS，再提交 `.shadow/refs/data/items.json.ref` 和 `data/items-version.json` 并触发部署。
 手动更新后也应提交这两个文件。
 
+### CDN 缓存
+
+部署完成后，工作流会用 `UPYUN_TOKEN` 刷新 `https://market.icexiv.top/` 和 `/index.html` 的又拍云缓存。HTML 沿用 GitHub 的 `max-age=600`，不刷新会使新版本最长延迟 10 分钟可见，而旧 HTML 引用的哈希资源可能已被替换。哈希资源与 `/items/` 保持不变，无需刷新。
+
+`UPYUN_TOKEN` 为又拍云开放 API 的 Token，scope 只需 `cache`。本地手动刷新：
+
+```bash
+UPYUN_TOKEN=your-token bun run purge-cdn
+```
+
+未配置该 secret 时工作流跳过刷新并继续，不会让部署失败。
+
 ## License
 
 MIT
