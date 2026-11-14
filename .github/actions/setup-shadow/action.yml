@@ -8,8 +8,8 @@ runs:
       uses: actions/cache@v4
       with:
         path: ~/.cargo/bin/shadow
-        key: shadow-${{ runner.os }}-${{ runner.arch }}-ceaaac778ab433f6666957facbf68eeb7c58b918
+        key: shadow-${{ runner.os }}-${{ runner.arch }}-7a357b12984e2f13aab7259391e98a729d99e67f
     - name: Install Shadow
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      run: cargo install --git https://github.com/AzurIce/shadow --rev ceaaac778ab433f6666957facbf68eeb7c58b918 --locked
+      run: cargo install --git https://github.com/AzurIce/shadow --rev 7a357b12984e2f13aab7259391e98a729d99e67f --locked -j 2
