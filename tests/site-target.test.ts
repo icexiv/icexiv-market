@@ -52,7 +52,8 @@ test('one build job produces both site targets', () => {
 test('both deployments run in parallel from the shared build', () => {
   assert.equal(workflow.jobs.deploy.needs, 'build')
   assert.equal(workflow.jobs['deploy-server'].needs, 'build')
-  assert.equal(workflow.jobs['deploy-server'].if, undefined)
+  assert.equal(workflow.jobs['deploy-server'].if, "github.event_name != 'pull_request' && github.ref == 'refs/heads/main'")
+  assert.equal(workflow.jobs.deploy.if, workflow.jobs['deploy-server'].if)
   assert.ok(workflow.jobs.deploy.steps.some(step =>
     step.uses?.startsWith('actions/deploy-pages@')))
   assert.ok(workflow.jobs['deploy-server'].steps.some(step =>

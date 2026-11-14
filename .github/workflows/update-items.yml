@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Check for upstream Item.csv updates
         id: check
@@ -89,4 +91,4 @@ jobs:
         if: steps.check.outputs.outdated == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run deploy.yml
+        run: gh workflow run deploy.yml --ref main

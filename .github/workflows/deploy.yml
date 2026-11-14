@@ -3,15 +3,15 @@ name: Deploy sites
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -22,12 +22,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check items.json freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           LOCAL_COMMIT=$(cat data/items-version.json | python3 -c "import sys,json; print(json.load(sys.stdin)['commit'])")
           echo "Local items.json commit: $LOCAL_COMMIT"
 
-          REMOTE_COMMIT=$(curl -s \
+          REMOTE_COMMIT=$(curl --fail --silent --show-error \
             -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
             "https://api.github.com/repos/thewakingsands/ffxiv-datamining-cn/commits?path=Item.csv&per_page=1" | \
             python3 -c "import sys,json; print(json.load(sys.stdin)[0]['sha'][:12])")
           echo "Remote Item.csv latest commit: $REMOTE_COMMIT"
@@ -60,12 +63,14 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Setup Shadow
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: ./.github/actions/setup-shadow
 
       - name: Restore and publish items to TOS
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           TOS_ACCESS_KEY: ${{ secrets.TOS_ACCESS_KEY }}
           TOS_SECRET_KEY: ${{ secrets.TOS_SECRET_KEY }}
@@ -107,6 +112,7 @@ jobs:
           retention-days: 7
 
   deploy-server:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     # 与 Pages 部署并行，两个 job 共用同一个 build 产物流程。
     runs-on: ubuntu-latest
     needs: build
@@ -134,6 +140,10 @@ jobs:
             dist/ deploy@82.156.196.54:/srv/market.icexiv.top/www/
 
   deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
