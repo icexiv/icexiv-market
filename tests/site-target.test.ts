@@ -58,6 +58,8 @@ test('both deployments run in parallel from the shared build', () => {
     step.uses?.startsWith('actions/deploy-pages@')))
   assert.ok(workflow.jobs['deploy-server'].steps.some(step =>
     step.run?.includes('/srv/market.icexiv.top/www')))
+  assert.ok(workflow.jobs['deploy-server'].steps.some(step =>
+    step.run?.includes("--filter='P /_analytics/***'")))
 })
 
 test('domestic and international artifacts are uploaded separately', () => {

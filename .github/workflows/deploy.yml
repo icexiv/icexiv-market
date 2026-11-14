@@ -136,6 +136,7 @@ jobs:
       - name: Deploy to market.icexiv.top
         run: |
           rsync -rlt --delete --delay-updates --chmod=D755,F644 \
+            --filter='P /_analytics/***' \
             -e "ssh -i ~/.ssh/id_ed25519" \
             dist/ deploy@82.156.196.54:/srv/market.icexiv.top/www/
 
