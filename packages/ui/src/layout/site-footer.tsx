@@ -31,9 +31,9 @@ export function SiteFooter() {
             href={POLICE_URL()}
             target="_blank"
             rel="noreferrer"
-            class={`${linkClass} inline-flex flex-col items-center gap-0.5`}
+            class={`${linkClass} inline-flex items-center gap-1.5`}
           >
-            <img src={POLICE_ICON} alt="" width="22" height="24" class="block h-6 w-[22px] object-contain" />
+            <img src={POLICE_ICON} alt="" width="18" height="20" class="block h-5 w-[18px] object-contain" />
             {POLICE_LICENSE}
           </a>
         )}
