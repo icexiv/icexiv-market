@@ -6,9 +6,10 @@ import { BuildCommitLink } from './build-badge'
 const RegionSelect = lazy(() => import('./region-select'))
 
 export function Navbar(props: {
-  navItems?: { href: string; label: string; end?: boolean }[]
+  navItems?: { href: string; label: string; end?: boolean; hideOnMobile?: boolean }[]
   variant?: 'pro'
   githubUrl?: string
+  homeUrl?: string
 }) {
   const variant = () => props.variant
 
@@ -69,26 +70,37 @@ export function Navbar(props: {
   return (
     <header class="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div class="flex h-14 max-w-7xl mx-auto items-center px-4 sm:px-6 lg:px-8">
-        <A href="/" class="mr-6 flex items-center gap-3">
-          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-semibold tracking-tight">
-            XIV
-          </div>
-          <div class="hidden sm:flex items-center gap-2">
-            <span class="text-base font-semibold tracking-tight text-foreground">Market</span>
-            {isPro() && (
-              <span class={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider border ${badgeClass()}`}>
-                {variant()}
-              </span>
-            )}
-          </div>
+        {/* 左：IceXIV 首页；右：本市场首页。两个独立入口，中间竖线分隔。 */}
+        <a
+          href={props.homeUrl ?? 'https://icexiv.github.io/'}
+          class="mr-2 flex items-center gap-2 sm:mr-3 sm:gap-2.5"
+          aria-label="IceXIV 首页"
+          title="IceXIV"
+        >
+          <svg viewBox="0 0 30 32" fill="none" aria-hidden="true" class="h-6 w-[22px] shrink-0 sm:h-7 sm:w-[26px]">
+            <path d="M15 1 27.5 8.2 15 15.4 2.5 8.2Z" fill="#9dc8ea"/>
+            <path d="m2.5 10.7 11 6.35v13L2.5 23.7Z" fill="#4a85bb"/>
+            <path d="m16.5 17.05 11-6.35v13l-11 6.35Z" fill="#76acd5"/>
+            <path d="m15 5.8 4.3 2.4-4.3 2.5-4.3-2.5Z" fill="#fff" fill-opacity=".8"/>
+          </svg>
+          <span class="hidden text-sm font-medium tracking-tight text-foreground sm:inline">IceXIV</span>
+        </a>
+        <span class="mx-2 h-5 w-px shrink-0 bg-border sm:mx-3" aria-hidden="true" />
+        <A href="/" class="mr-3 flex shrink-0 items-center gap-2 sm:mr-6">
+          <span class="text-base font-semibold tracking-tight text-foreground">Market</span>
+          {isPro() && (
+            <span class={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider border ${badgeClass()}`}>
+              {variant()}
+            </span>
+          )}
         </A>
 
-        <nav class="flex items-center space-x-6 text-sm font-medium" aria-label="主导航">
+        <nav class="flex shrink-0 items-center space-x-4 text-sm font-medium sm:space-x-6" aria-label="主导航">
           <For each={props.navItems ?? []}>
             {(item) => (
               <A
                 href={item.href}
-                class="transition-colors hover:text-foreground/80 text-foreground/60"
+                class={`whitespace-nowrap transition-colors hover:text-foreground/80 text-foreground/60${item.hideOnMobile ? ' hidden sm:inline-block' : ''}`}
                 activeClass="text-foreground"
                 end={item.end}
               >
@@ -128,7 +140,7 @@ export function Navbar(props: {
               href={props.githubUrl}
               target="_blank"
               rel="noopener noreferrer"
-              class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-background text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              class="hidden h-8 w-8 items-center justify-center rounded-lg border border-input bg-background text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:inline-flex"
               aria-label="GitHub"
               title="GitHub"
             >
