@@ -5,7 +5,9 @@
 /** 必须与工信部公共查询结果逐字一致（含 -1 之类的网站序号后缀） */
 const ICP_LICENSE: string = '京ICP备2026077264号-1'
 /** 例如：沪公网安备 31010502000000号 */
-const POLICE_LICENSE: string = ''
+const POLICE_LICENSE: string = '京公网安备11010502064164号'
+/** 公安备案图标，位于 app/public */
+const POLICE_ICON: string = '/police-beian.png'
 
 const ICP_URL = 'https://beian.miit.gov.cn/'
 /** 公安备案查询页只认纯数字编号，从上面的全称里取 */
@@ -25,7 +27,13 @@ export function SiteFooter() {
           </a>
         )}
         {POLICE_LICENSE && (
-          <a href={POLICE_URL()} target="_blank" rel="noopener noreferrer" class={linkClass}>
+          <a
+            href={POLICE_URL()}
+            target="_blank"
+            rel="noreferrer"
+            class={`${linkClass} inline-flex items-center gap-1.5`}
+          >
+            <img src={POLICE_ICON} alt="" width="20" height="22" class="block h-[22px] w-5 object-contain" />
             {POLICE_LICENSE}
           </a>
         )}
