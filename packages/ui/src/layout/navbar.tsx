@@ -5,6 +5,10 @@ import { BuildCommitLink } from './build-badge'
 
 const RegionSelect = lazy(() => import('./region-select'))
 
+const navLinkClass =
+  'whitespace-nowrap transition-colors text-foreground/60 hover:text-foreground'
+const navLinkMobileHiddenClass = `${navLinkClass} hidden sm:inline-block`
+
 export function Navbar(props: {
   navItems?: { href: string; label: string; end?: boolean; hideOnMobile?: boolean }[]
   variant?: 'pro'
@@ -73,7 +77,7 @@ export function Navbar(props: {
         {/* 左：IceXIV 首页；右：本市场首页。两个独立入口，中间竖线分隔。 */}
         <a
           href={props.homeUrl ?? 'https://icexiv.github.io/'}
-          class="mr-2 flex items-center gap-2 sm:mr-3 sm:gap-2.5"
+          class="flex items-center gap-2 transition-opacity hover:opacity-70 sm:gap-2.5"
           aria-label="IceXIV 首页"
           title="IceXIV"
         >
@@ -86,7 +90,7 @@ export function Navbar(props: {
           <span class="hidden text-sm font-medium tracking-tight text-foreground sm:inline">IceXIV</span>
         </a>
         <span class="mx-2 h-5 w-px shrink-0 bg-border sm:mx-3" aria-hidden="true" />
-        <A href="/" class="mr-3 flex shrink-0 items-center gap-2 sm:mr-6">
+        <A href="/" class="mr-3 flex shrink-0 items-center gap-2 transition-opacity hover:opacity-70 sm:mr-6">
           <span class="text-base font-semibold tracking-tight text-foreground">Market</span>
           {isPro() && (
             <span class={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider border ${badgeClass()}`}>
@@ -100,7 +104,7 @@ export function Navbar(props: {
             {(item) => (
               <A
                 href={item.href}
-                class={`whitespace-nowrap transition-colors hover:text-foreground/80 text-foreground/60${item.hideOnMobile ? ' hidden sm:inline-block' : ''}`}
+                class={item.hideOnMobile ? navLinkMobileHiddenClass : navLinkClass}
                 activeClass="text-foreground"
                 end={item.end}
               >
