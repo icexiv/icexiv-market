@@ -21,6 +21,7 @@ function Layout(props: { children?: any }) {
       {/* 内部 region-select 仍 lazy，其 chunk 失败由这个边界兜底（含"刷新页面"恢复） */}
       <ErrorBoundary>
         <Navbar
+          logoUrl={`${import.meta.env.BASE_URL}logo.png`}
           githubUrl="https://github.com/AzurIce/xiv-market"
           homeUrl={import.meta.env.VITE_SITE_TARGET === 'cn' ? 'https://icexiv.top/' : 'https://icexiv.github.io/'}
           navItems={[

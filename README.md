@@ -1,6 +1,17 @@
+<p align="center">
+  <img src="app/public/logo.png" width="160" height="160" alt="XIV Market：交易板与 IceXIV 冰方块" />
+</p>
+
 # XIV Market
 
 XIV Market 使用 [Universalis](https://universalis.app) 公开 API 直接查询 FFXIV 市场行情。无需后端，纯前端静态部署。
+
+## 项目标识
+
+Logo 以 FF14 交易板为主体，左上后方露出部分 IceXIV 冰方块，使用透明背景以适配不同页面。
+原图位于 `assets/logo.png`；`app/public/logo.png` 是 512px 展示版，导航栏与本 README 共用。
+`app/public/favicon.png` 为 32px 浏览器图标，`favicon.ico` 包含 16 / 32 / 48px，`apple-touch-icon.png` 为 180px。
+网页与报表入口使用同一套图标，部署到域名根目录或 GitHub Pages 子路径时均通过 Vite 的 `BASE_URL` 解析资源。
 
 ## 功能
 
