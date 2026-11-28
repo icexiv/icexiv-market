@@ -1,6 +1,6 @@
 import { createMemo, createSignal, createEffect, Show, For, onMount, onCleanup, type JSX } from 'solid-js'
 import { Root as ButtonPrimitive } from '@kobalte/core/button'
-import { computeItemStats, filterMarketQuality, getIconUrl, baseUrl, type ItemInfo, type WorldDirectory, type ItemReportMarketState, type ItemReportHistoryState, type MarketQuality } from '@xiv-market/shared'
+import { computeItemStats, filterMarketQuality, getIconUrl, baseUrl, isFishItem, type ItemInfo, type WorldDirectory, type ItemReportMarketState, type ItemReportHistoryState, type MarketQuality } from '@xiv-market/shared'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../card'
 import { QualityBadge } from '../quality-badge'
 import { Skeleton } from '../skeleton'
@@ -12,7 +12,7 @@ import { RefreshButton } from '../refresh-button'
 import { WorldBadge } from '../world-badge'
 import { Tooltip, TooltipPortal, TooltipTrigger, TooltipContent } from '../tooltip'
 import { PriceRangeStrip } from './price-range-strip'
-import { ListingTableSkeleton, ListingChartSkeleton, ChartErrorCard, ServerListingBarChart, ServerListingViolin, ServerHistoryTrendChart, ServerHistoryScatterChart } from './charts'
+import { ListingTableSkeleton, ListingChartSkeleton, ChartErrorCard, ServerListingBarChart, ServerHistoryTrendChart, ServerHistoryScatterChart } from './charts'
 import { formatGil, formatDailySales, formatTime } from './format'
 
 export interface ItemReportViewProps {
@@ -37,7 +37,6 @@ export function ItemReportView(props: ItemReportViewProps) {
   const itemId = () => String(props.itemId)
   const scope = () => props.scope
   const [activeTab, setActiveTab] = createSignal('listings')
-  const [listingChartTab, setListingChartTab] = createSignal('bar')
   const [historyChartTab, setHistoryChartTab] = createSignal('line')
   const [copyFeedback, setCopyFeedback] = createSignal('')
   const [copyTooltipOpen, setCopyTooltipOpen] = createSignal(false)
@@ -76,16 +75,36 @@ export function ItemReportView(props: ItemReportViewProps) {
   const showHistoryWorld = createMemo(() => history().some(sale => Boolean(sale.worldName) && sale.worldName !== scope()))
   const stats = createMemo(() => computeItemStats(marketData(), currentListings(), props.item.canBeHq))
 
-  // NQ/HQ 双条对比时的共享坐标域，让两条区间条可以上下直观对比
+  // 每个品质的挂单点 / 成交点：给 P25~P75 图画厚度，也给成交自己的区间
+  const qualitySeries = createMemo(() => {
+    const build = (hq: boolean) => {
+      const listings = filterMarketQuality(currentListings(), hq ? 'hq' : 'nq')
+        .map((l) => ({ price: Number(l.pricePerUnit ?? 0), quantity: Math.max(1, Number(l.quantity ?? 0)) }))
+        .filter((p) => Number.isFinite(p.price) && p.price > 0)
+      const sales = filterMarketQuality(history(), hq ? 'hq' : 'nq')
+        .map((s) => ({ price: Number(s.pricePerUnit ?? 0), quantity: Math.max(1, Number(s.quantity ?? 0)) }))
+        .filter((p) => Number.isFinite(p.price) && p.price > 0)
+      const prices = sales.map((p) => p.price).sort((a, b) => a - b)
+      const quartile = (ratio: number) => (prices.length ? prices[Math.floor((prices.length - 1) * ratio)] : 0)
+      return { listings, sales, saleP25: quartile(0.25), saleP50: quartile(0.5), saleP75: quartile(0.75) }
+    }
+    return { nq: build(false), hq: build(true) }
+  })
+
+  // NQ/HQ 双条对比时的共享坐标域，让两条区间条可以上下直观对比。
+  // 成交区间可能落在挂单区间之外，一并纳入域内。
   const sharedDistDomain = createMemo(() => {
     const nq = stats()?.nqDist
     const hq = stats()?.hqDist
     if (!nq || !hq) return null
-    const lo = Math.min(nq.min, hq.min)
-    const hi = Math.max(nq.p75, hq.p75)
-    const span = hi - lo
-    const pad = span > 0 ? span * 0.25 : Math.max(hi * 0.1, 1)
-    return { lo: lo - pad, hi: hi + pad }
+    const series = qualitySeries()
+    const lows = [nq.min, hq.min, series.nq.saleP25, series.hq.saleP25].filter((v) => v > 0)
+    const highs = [nq.p75, hq.p75, series.nq.saleP75, series.hq.saleP75].filter((v) => v > 0)
+    const lo = Math.min(...lows)
+    const hi = Math.max(...highs)
+    const span = hi > lo ? hi - lo : Math.max(hi * 0.1, 1)
+    // 左端留少一点：最低价就在条的最左侧
+    return { lo: Math.max(0, lo - span * 0.05), hi: hi + span * 0.18 }
   })
 
   // Explicit quality never falls back based on current stock. Without a quality
@@ -129,6 +148,7 @@ export function ItemReportView(props: ItemReportViewProps) {
     minListing: any
     selectable: boolean
   }) => {
+    const series = () => (props.hq ? qualitySeries().hq : qualitySeries().nq)
     const selected = () => qualityFilter() === (props.hq ? 'hq' : 'nq')
     return (
       <ButtonPrimitive
@@ -165,6 +185,11 @@ export function ItemReportView(props: ItemReportViewProps) {
             p50={props.dist.p50}
             p75={props.dist.p75}
             domain={sharedDistDomain() ?? undefined}
+            listingPoints={series().listings}
+            salePoints={series().sales}
+            saleP25={series().saleP25}
+            saleP50={series().saleP50}
+            saleP75={series().saleP75}
           />
         </div>
       </ButtonPrimitive>
@@ -327,6 +352,48 @@ export function ItemReportView(props: ItemReportViewProps) {
                   <TooltipContent>在 Garland Tools 查看</TooltipContent>
                 </TooltipPortal>
               </Tooltip>
+
+              {/* IceXIV DB */}
+              <Tooltip>
+                <TooltipTrigger
+                  as="a"
+                  href={`https://db.icexiv.top/items/${itemId()}.html`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class={
+                    'rounded-md hover:bg-accent/80 hover:opacity-100 opacity-70 transition-all duration-200 flex items-center justify-center overflow-hidden ' +
+                    (isScrolled() ? 'h-6 w-6' : 'h-7 w-7')
+                  }
+                  aria-label="在 IceXIV DB 查看"
+                >
+                  <img src={`${baseUrl()}icexivdb.png`} alt="IceXIV DB" class={isScrolled() ? 'h-3.5 w-3.5' : 'h-4 w-4'} draggable="false" />
+                </TooltipTrigger>
+                <TooltipPortal>
+                  <TooltipContent>在 IceXIV DB 查看</TooltipContent>
+                </TooltipPortal>
+              </Tooltip>
+
+              {/* 鱼糕：只有水产品才有 */}
+              <Show when={isFishItem(props.itemId)}>
+                <Tooltip>
+                  <TooltipTrigger
+                    as="a"
+                    href={`https://fish.ffmomola.com/ng/#/wiki/fish/${itemId()}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class={
+                      'rounded-md hover:bg-accent/80 hover:opacity-100 opacity-70 transition-all duration-200 flex items-center justify-center overflow-hidden ' +
+                      (isScrolled() ? 'h-6 w-6' : 'h-7 w-7')
+                    }
+                    aria-label="在鱼糕查看"
+                  >
+                    <img src={`${baseUrl()}fishcake.webp`} alt="鱼糕" class={isScrolled() ? 'h-3.5 w-3.5' : 'h-4 w-4'} draggable="false" />
+                  </TooltipTrigger>
+                  <TooltipPortal>
+                    <TooltipContent>在鱼糕查看</TooltipContent>
+                  </TooltipPortal>
+                </Tooltip>
+              </Show>
             </div>
 
             <div class="flex-1 min-w-2 sm:min-w-4" />
@@ -439,7 +506,7 @@ export function ItemReportView(props: ItemReportViewProps) {
                 fallback={<div class="text-muted-foreground">-</div>}
               >
                 <div class="mb-1 px-2 text-xs font-medium text-muted-foreground">
-                  最低挂单 · 价格分布
+                  最低挂单 · 挂单与成交分布
                 </div>
                 <div class="space-y-1">
                   <Show when={stats()?.nqDist}>
@@ -520,10 +587,45 @@ export function ItemReportView(props: ItemReportViewProps) {
         <ListingChartSkeleton />
       </Show>
       <Show when={props.market.data !== undefined}>
-        <Card class="mb-6 py-3" data-report-section="listing-distribution">
+        <Card class="mb-6 overflow-hidden py-3" data-report-section="listing-distribution">
           <CardHeader class="pb-2">
-            <CardTitle class="text-sm">挂单价格分布</CardTitle>
-            <CardDescription class="text-xs">各服务器挂单价格可视化</CardDescription>
+            <div class="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle class="text-sm">挂单与成交分布</CardTitle>
+              <CardDescription class="text-xs">各服务器挂单区间与近 30 天成交区间</CardDescription>
+            </div>
+            {/* 图例：用和图表一致的小图形示意，不占表格行空间 */}
+            <div class="hidden shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 pt-0.5 text-[10px] text-muted-foreground sm:flex">
+              <span class="inline-flex items-center gap-1">
+                <svg viewBox="0 0 18 10" class="h-2.5 w-[18px]" aria-hidden="true">
+                  <rect x="0" y="0" width="7" height="10" rx="1" class="fill-primary" fill-opacity="0.14" />
+                </svg>
+                最低价
+              </span>
+              <span class="inline-flex items-center gap-1">
+                <svg viewBox="0 0 18 10" class="h-2.5 w-[18px]" aria-hidden="true">
+                  <path
+                    d="M1 5 C5 1 13 1 17 5 C13 9 5 9 1 5 Z"
+                    class="fill-muted-foreground"
+                    fill-opacity="0.3"
+                  />
+                </svg>
+                挂单 P25~P75
+              </span>
+              <span class="inline-flex items-center gap-1">
+                <svg viewBox="0 0 18 10" class="h-2.5 w-[18px]" aria-hidden="true">
+                  <path d="M1 5 C5 2 13 2 17 5 C13 8 5 8 1 5 Z" class="fill-amber-500" fill-opacity="0.55" />
+                </svg>
+                成交 P25~P75
+              </span>
+              <span class="inline-flex items-center gap-1">
+                <svg viewBox="0 0 18 10" class="h-2.5 w-[18px]" aria-hidden="true">
+                  <line x1="9" y1="0" x2="9" y2="10" class="stroke-amber-700" stroke-width="2.5" stroke-opacity="0.5" />
+                </svg>
+                成交中位
+              </span>
+            </div>
+            </div>
           </CardHeader>
           <CardContent class="pt-0">
             <Show
@@ -536,18 +638,7 @@ export function ItemReportView(props: ItemReportViewProps) {
                 />
               }
             >
-              <Tabs value={listingChartTab()} onChange={setListingChartTab}>
-                <TabsList class="mb-4">
-                  <TabsTrigger value="bar">条形图</TabsTrigger>
-                  <TabsTrigger value="violin">小提琴图</TabsTrigger>
-                </TabsList>
-                <TabsContent value="bar">
-                  <ServerListingBarChart directory={directory()} listings={filteredListings()} history={filteredHistory()} scope={scope()} historyLoading={props.history.data === undefined && !props.history.error} historyError={props.history.data === undefined && Boolean(props.history.error)} />
-                </TabsContent>
-                <TabsContent value="violin">
-                  <ServerListingViolin animate={props.animateCharts} directory={directory()} listings={filteredListings()} scope={scope()} />
-                </TabsContent>
-              </Tabs>
+              <ServerListingBarChart directory={directory()} listings={filteredListings()} history={filteredHistory()} scope={scope()} historyLoading={props.history.data === undefined && !props.history.error} historyError={props.history.data === undefined && Boolean(props.history.error)} />
             </Show>
           </CardContent>
         </Card>

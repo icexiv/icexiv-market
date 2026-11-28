@@ -1,0 +1,71 @@
+# Import this snippet INSIDE market.icexiv.top, not the direct-IP site.
+(market_medama_collector) {
+	# Join the site's mutually exclusive handle group, ahead of its SPA fallback.
+	handle /_analytics/* {
+		# route preserves the allowlist order before the final namespace rejection.
+		route {
+			@medama_script {
+				method GET HEAD
+				path /_analytics/tracker.js
+			}
+			handle @medama_script {
+				header Cache-Control "no-cache"
+				file_server
+			}
+
+			@medama_ping {
+				method GET
+				path /_analytics/api/event/ping
+			}
+			handle @medama_ping {
+				rewrite * /api/event/ping
+				reverse_proxy http://100.119.68.25:18180 {
+					import market_medama_upstream
+				}
+			}
+
+			@medama_hit {
+				method POST
+				path /_analytics/api/event/hit
+				header Origin https://market.icexiv.top
+			}
+			handle @medama_hit {
+				@medama_oversized expression `{http.request.header.Content-Length} != "" && int({http.request.header.Content-Length}) > 8192`
+				respond @medama_oversized 413
+				request_body {
+					max_size 8KB
+				}
+				rewrite * /api/event/hit
+				reverse_proxy http://100.119.68.25:18180 {
+					import market_medama_upstream
+				}
+			}
+
+			# Never let unknown collector/admin paths fall through to the SPA.
+			handle {
+				respond 404
+			}
+		}
+	}
+}
+
+(market_medama_upstream) {
+	# Direct private-IP upstream; never expose the dashboard on this public site.
+	header_up X-Forwarded-For {http.request.remote.host}
+	header_up -Forwarded
+	header_up -CF-Connecting-IP
+	header_up -X-Real-IP
+	header_up -X-Client-IP
+	header_up -Fastly-Client-IP
+	header_up -Cookie
+	header_up -Authorization
+	header_up -Referer
+	header_down -Set-Cookie
+	header_down -Access-Control-Allow-Origin
+	transport http {
+		dial_timeout 2s
+		response_header_timeout 3s
+		read_timeout 3s
+		write_timeout 3s
+	}
+}

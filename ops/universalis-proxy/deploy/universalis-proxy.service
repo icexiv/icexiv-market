@@ -1,0 +1,40 @@
+[Unit]
+Description=Universalis caching proxy for XIV Market
+Documentation=https://github.com/AzurIce/xiv-market
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 二进制由 deploy.sh 安装；环境变量可用 /etc/universalis-proxy.env 覆盖
+ExecStart=/usr/local/bin/universalis-proxy
+EnvironmentFile=-/etc/universalis-proxy.env
+Environment=LISTEN=127.0.0.1:18090
+Environment=UPSTREAM=https://universalis.app
+Environment=CACHE_MAX_MB=64
+Environment=CACHE_MAX_ENTRIES=20000
+Environment=DEFAULT_TTL=300
+Environment=MARKETABLE_TTL=3600
+Environment=UPSTREAM_RPS=8
+Environment=UPSTREAM_BURST=8
+
+# 只做转发与内存缓存，不需要写盘、不需要额外权限
+DynamicUser=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryMax=192M
+TasksMax=256
+
+Restart=always
+RestartSec=2s
+
+[Install]
+WantedBy=multi-user.target

@@ -5,6 +5,8 @@ import { defineConfig, loadEnv } from 'vite'
 import solid from 'vite-plugin-solid'
 import tailwindcss from '@tailwindcss/vite'
 import { resolveSiteTarget } from './site-target'
+import { medamaAnalytics } from './analytics'
+import { createEnvProxyAgent } from './proxy-agent'
 
 function getGitInfo() {
   try {
@@ -27,7 +29,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     base,
-    plugins: [solid(), tailwindcss()],
+    plugins: [solid(), tailwindcss(), medamaAnalytics(siteTarget, mode)],
     build: {
       rolldownOptions: {
         input: {
@@ -56,6 +58,9 @@ export default defineConfig(({ mode }) => {
           target: 'https://universalis.app',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/universalis/, ''),
+          // 系统代理只对浏览器/curl 生效，dev server 的 Node 客户端会直连并在
+          // 只放行代理的网络里卡死在半途；有 HTTPS_PROXY 时改走隧道
+          agent: createEnvProxyAgent(),
         },
       },
     },

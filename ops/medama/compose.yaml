@@ -1,0 +1,33 @@
+name: market-medama
+
+services:
+  medama:
+    # Medama v0.6.2, multi-architecture release index (includes linux/arm64).
+    image: ghcr.io/medama-io/medama@sha256:3ebc5e43f1ce8c5b846ba52fc086dc25467fb430eca8ee825a6b9e931d98044c
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18180:8080"
+      - "100.119.68.25:18180:8080"
+    environment:
+      HOME: /app/data
+      PORT: "8080"
+      APP_DATABASE_HOST: /app/data/me_app.db
+      ANALYTICS_DATABASE_HOST: /app/data/me_analytics.db
+    volumes:
+      - ./data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 128
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

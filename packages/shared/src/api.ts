@@ -3,7 +3,10 @@ import type { DataCenter, World, MarketData, HistoryData, AggregatedItemData } f
 import { fetchJsonWithTimeout } from './async'
 import { canItemBeHq } from './items'
 
-export const UNIVERSALIS_BASE_URL = import.meta.env?.DEV ? '/api/universalis' : 'https://universalis.app'
+// 默认值：开发走 Vite 反向代理，线上浏览器直连上游。
+// 构建时可用 VITE_UNIVERSALIS_BASE 覆盖（例如灰度站改成同源的 /api/universalis）。
+export const UNIVERSALIS_BASE_URL =
+  import.meta.env?.VITE_UNIVERSALIS_BASE || (import.meta.env?.DEV ? '/api/universalis' : 'https://universalis.app')
 
 const STATIC_CACHE_TTL = 24 * 60 * 60 * 1000
 const DC_CACHE_KEY = 'xiv_data_centers'

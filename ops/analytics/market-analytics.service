@@ -1,0 +1,30 @@
+[Unit]
+Description=Generate the XIV Market access report
+After=caddy.service
+
+[Service]
+Type=oneshot
+User=market-analytics
+Group=caddy
+ExecStart=/usr/bin/python3 /usr/local/libexec/market-analytics.py
+Environment=TZ=Asia/Shanghai
+Environment=LC_ALL=C.UTF-8
+StateDirectory=market-analytics
+StateDirectoryMode=0750
+UMask=0027
+Nice=10
+IOSchedulingClass=idle
+CPUQuota=50%
+MemoryMax=512M
+TimeoutStartSec=3min
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=

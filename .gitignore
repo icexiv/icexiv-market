@@ -1,4 +1,5 @@
 /target
+/ops/universalis-proxy/target
 /data/*
 !/data/items-version.json
 .env
@@ -6,6 +7,7 @@
 node_modules
 .direnv
 tmp_Item.csv
+.openchamber/
 
 # shadow
 /data/items.json

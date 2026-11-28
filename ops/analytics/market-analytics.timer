@@ -1,0 +1,12 @@
+[Unit]
+Description=Update the XIV Market access report every five minutes
+
+[Timer]
+OnCalendar=*-*-* *:0/5:00
+RandomizedDelaySec=15s
+AccuracySec=10s
+Persistent=true
+Unit=market-analytics.service
+
+[Install]
+WantedBy=timers.target

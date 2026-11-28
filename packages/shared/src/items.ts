@@ -140,10 +140,11 @@ export function getIconUrl(iconId: number): string[] {
   const folder = Math.floor(iconId / 1000) * 1000
   const paddedFolder = String(folder).padStart(6, '0')
   const paddedFile = String(iconId).padStart(6, '0')
+  // 首选自家 IceXIV DB 发布到 TOS CDN 的 webp，失败再退回公共图源
   return [
+    `https://cdn.icexiv.top/icons/${iconId}.webp`,
     `https://xivapi.com/i/${paddedFolder}/${paddedFile}.png`,
     `https://www.garlandtools.org/files/icons/item/t/${iconId}.png`,
-    `https://garlandtools.org/files/icons/item/t/${iconId}.png`,
   ]
 }
 

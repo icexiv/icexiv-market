@@ -1,0 +1,32 @@
+# market.icexiv.top 站点内的 Universalis 反代入口。
+#
+# 放到 /etc/caddy/market-api.caddy，在站点块内用 import 引入（和 market-analytics 一样）：
+#
+#   market.icexiv.top {
+#       import market_api
+#       ...
+#   }
+#
+# 前端把 BASE_URL 指到 /api/universalis 时即可同源访问；handle_path 会剥掉前缀，
+# 所以上游缓存服务看到的仍然是 /api/v2/...。
+
+market_api:
+	handle_path /api/universalis/* {
+		@allowed path /api/v2/*
+		handle @allowed {
+			encode zstd gzip
+			reverse_proxy 127.0.0.1:18090 {
+				# 反向代理上游统一走 HTTP/1.1 长连接即可；缓存服务自己会复用与 Universalis 的连接
+				header_up Host {upstream_hostport}
+				header_up X-Forwarded-For {remote_host}
+				flush_interval -1
+				transport http {
+					versions 1.1
+					keepalive 30s
+				}
+			}
+		}
+		handle {
+			respond 404
+		}
+	}

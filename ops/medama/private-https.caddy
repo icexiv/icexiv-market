@@ -1,0 +1,17 @@
+# Imported by the Mac mini's existing Caddy. Private interfaces only.
+https://192.168.2.11:18181, https://100.119.68.25:18181 {
+	bind 192.168.2.11 100.119.68.25
+	tls internal
+	header X-Robots-Tag "noindex, nofollow, noarchive"
+
+	# Public root certificate only; never serve Caddy's storage or private keys.
+	handle /medama-ca.crt {
+		header Content-Type application/x-x509-ca-cert
+		root * {$HOME}/Services/medama
+		file_server
+	}
+
+	handle {
+		reverse_proxy http://127.0.0.1:18180
+	}
+}

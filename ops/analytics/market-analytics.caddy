@@ -1,0 +1,20 @@
+(market_access_log) {
+	log {
+		output file /var/log/caddy/market-access.log {
+			roll_size 20MiB
+			roll_keep 10
+			roll_keep_for 720h
+			roll_uncompressed
+		}
+		format json
+	}
+}
+
+# Only reachable on the server itself or through an SSH tunnel.
+http://:8081 {
+	bind 127.0.0.1
+	root * /var/lib/market-analytics/current/report
+	header Cache-Control "no-store"
+	header X-Robots-Tag "noindex, nofollow, noarchive"
+	file_server
+}

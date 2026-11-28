@@ -25,7 +25,7 @@ function Layout(props: { children?: any }) {
           githubUrl="https://github.com/AzurIce/xiv-market"
           homeUrl={import.meta.env.VITE_SITE_TARGET === 'cn' ? 'https://icexiv.top/' : 'https://icexiv.github.io/'}
           navItems={[
-            { href: '/', label: '市场', end: true, hideOnMobile: true },
+            { href: '/', label: '市场', end: true },
             { href: '/materia', label: '魔晶石' },
           ]}
         />

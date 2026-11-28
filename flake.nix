@@ -1,12 +1,23 @@
 {
-  description = "xiv-market — FFXIV market board viewer (Solid.js + Vite + bun)";
+  description = "xiv-market — FFXIV market board viewer (Solid.js + Vite + bun) and its Universalis proxy (Rust)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # crane 只做 cargo 构建库，自身不带 nixpkgs 输入，pkgs 由本 flake 传入。
+    crane.url = "github:ipetkov/crane";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
-    { self, nixpkgs }:
+    {
+      self,
+      nixpkgs,
+      crane,
+      rust-overlay,
+    }:
     let
       systems = [
         "x86_64-linux"
@@ -14,7 +25,31 @@
         "x86_64-darwin"
         "aarch64-darwin"
       ];
-      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
+      # rust-overlay 叠到 pkgs 上，pkgs.rust-bin 才可用（源码安装的固定版本工具链）。
+      forAllSystems =
+        f:
+        nixpkgs.lib.genAttrs systems (
+          system:
+          f (
+            import nixpkgs {
+              inherit system;
+              overlays = [ (import rust-overlay) ];
+            }
+          )
+        );
+
+      # 构建与 devShell 共用同一套 cargo/rustc，避免两边版本不一致。
+      mkCraneLib =
+        pkgs:
+        (crane.mkLib pkgs).overrideToolchain (
+          p:
+          p.rust-bin.stable.latest.default.override {
+            extensions = [
+              "rustfmt"
+              "clippy"
+            ];
+          }
+        );
 
       mkPackage =
         pkgs:
@@ -129,6 +164,35 @@
           '';
           meta.description = "xiv-market static site and item-data renderer";
         };
+
+      # ops/universalis-proxy：Rust 版 Universalis 缓存反代，crane 负责 Cargo 依赖与编译。
+      mkUniversalisProxy =
+        pkgs:
+        let
+          craneLib = mkCraneLib pkgs;
+          # 只把 Cargo 需要的文件收进源码，deploy/、README 改动不会触发重编译。
+          src = craneLib.cleanCargoSource ./ops/universalis-proxy;
+          commonArgs = {
+            inherit src;
+            strictDeps = true;
+            # 依赖锁定在 crate 自己的 Cargo.lock，crane 据此 vendor 到离线目录。
+            cargoLock = ./ops/universalis-proxy/Cargo.lock;
+          };
+          # 依赖单独编译一次，改 main.rs 时只重编自身。
+          cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+        in
+        craneLib.buildPackage (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+            # 仓库里没有测试，跳过 cargo test 以免再编一遍。
+            doCheck = false;
+            meta = {
+              description = "Universalis caching reverse proxy for XIV Market";
+              mainProgram = "universalis-proxy";
+            };
+          }
+        );
     in
     {
       packages = forAllSystems (
@@ -139,11 +203,13 @@
         {
           default = market;
           xiv-market = market;
+          universalis-proxy = mkUniversalisProxy pkgs;
         }
       );
 
       devShells = forAllSystems (pkgs: {
-        default = pkgs.mkShell {
+        # craneLib.devShell 自带同一套 rustc/cargo/clippy/rustfmt。
+        default = (mkCraneLib pkgs).devShell {
           packages = with pkgs; [
             bun
             nodejs_24 # tsc / vite 需要 node 兼容运行时
@@ -152,8 +218,9 @@
 
           shellHook = ''
             echo "xiv-market dev shell"
-            echo "  bun:  $(bun --version)"
-            echo "  node: $(node --version)"
+            echo "  bun:   $(bun --version)"
+            echo "  node:  $(node --version)"
+            echo "  rustc: $(rustc --version)"
           '';
         };
       });

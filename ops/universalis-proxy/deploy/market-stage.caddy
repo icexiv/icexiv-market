@@ -1,0 +1,50 @@
+# 灰度站：market-stage.icexiv.top
+#
+# 放在 /etc/caddy/market-stage.caddy，并在 Caddyfile 顶层 `import market-stage.caddy`。
+# 与正式站的区别只有两处：静态目录不同，且 /api/universalis/* 由本机 Rust 反代（缓存）提供。
+
+(market_stage) {
+	encode zstd gzip
+	root * /srv/market-stage.icexiv.top/www
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		# 灰度站不要被搜索引擎收录，避免和正式站重复
+		X-Robots-Tag "noindex"
+	}
+
+	@immutable path /assets/* /items/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	@html path / /index.html /render.html
+	header @html Cache-Control "public, max-age=0, must-revalidate"
+
+	# 前端构建时 VITE_UNIVERSALIS_BASE=/api/universalis，这里把前缀剥掉交给缓存服务
+	handle_path /api/universalis/* {
+		@allowed path /api/v2/*
+		handle @allowed {
+			reverse_proxy 127.0.0.1:18090 {
+				header_up X-Forwarded-For {remote_host}
+			}
+		}
+		handle {
+			respond 404
+		}
+	}
+
+	handle /api/* {
+		respond 404
+	}
+
+	handle /items/* {
+		file_server
+	}
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+market-stage.icexiv.top {
+	import market_stage
+}

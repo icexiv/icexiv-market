@@ -125,7 +125,7 @@ app/
 ## 物品数据
 
 - 物品中文名/图标/是否可 HQ（`canBeHq`，仅 true 时输出）映射来自 [thewakingsands/ffxiv-datamining-cn](https://github.com/thewakingsands/ffxiv-datamining-cn) 的 `Item.csv`
-- 图标 URL 格式：`https://www.garlandtools.org/files/icons/item/t/{icon_id}.png`
+- 图标 URL 格式：首选 `https://cdn.icexiv.top/icons/{icon_id}.webp`（IceXIV DB 发布到 TOS CDN），失败回退 xivapi / garlandtools
 - `bun run update-items` 生成 `data/items.json` 和 `data/items-version.json`，再用 `shadow publish` 发布到 TOS；提交版本文件和 `.shadow/refs/data/items.json.ref`，不提交 JSON 文件本体
 - `scripts/prepare-items.ts` 在开发和构建前读取 Shadow 配置与 ref，校验本地 JSON（缺失时从公开 TOS URL 下载），生成被忽略的 `app/.generated/items-source.json` 和 `app/public/items/<sha256>.json`
 - Vite 注入 `__ITEMS_SOURCES__`、`__ITEMS_SHA256__` 和 `__ITEMS_SIZE__`；TOS 优先，2 秒后启用 GitHub Pages 备用源，取首个校验及解析成功的结果并取消其他请求。失败立即启动备用源，两个源均失败才设置 error；不得绕过 SHA-256 校验接受混杂版本

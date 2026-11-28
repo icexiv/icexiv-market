@@ -93,7 +93,7 @@ export function Navbar(props: {
         <span class="mx-2 h-5 w-px shrink-0 bg-border sm:mx-3" aria-hidden="true" />
         <A href="/" class="mr-3 flex shrink-0 items-center gap-2 transition-opacity hover:opacity-70 sm:mr-6">
           <img src={props.logoUrl} width="32" height="32" alt="" class="size-7 shrink-0 object-contain sm:size-8" />
-          <span class="text-base font-semibold tracking-tight text-foreground">Market</span>
+          <span class="hidden text-base font-semibold tracking-tight text-foreground min-[400px]:inline">Market</span>
           {isPro() && (
             <span class={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider border ${badgeClass()}`}>
               {variant()}
@@ -118,7 +118,7 @@ export function Navbar(props: {
 
         <div class="flex flex-1 items-center justify-end space-x-3">
           <div class="flex items-center space-x-2">
-            <label for="region-select" class="text-sm text-muted-foreground hidden sm:inline">
+            <label for="region-select" class="hidden shrink-0 whitespace-nowrap text-sm text-muted-foreground md:inline">
               区域
             </label>
             <Show
