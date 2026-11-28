@@ -767,7 +767,16 @@ export function ServerListingBarChart(props: {
                     </Show>
                     <Show when={listingPath() && !props.hidden?.has('listing')}>
                       {/* 挂单波形用该服务器所在大区的颜色，浅填充；成交仍是琥珀色 */}
-                      <path d={listingPath()} fill={color.solid} fill-opacity="0.25" />
+                      <path
+                        d={listingPath()}
+                        fill={color.solid}
+                        fill-opacity="0.15"
+                        stroke={color.solid}
+                        stroke-opacity="0.3"
+                        stroke-width="1"
+                        stroke-linejoin="round"
+                        vector-effect="non-scaling-stroke"
+                      />
                     </Show>
                     <Show when={salePath() && !props.hidden?.has('sale')}>
                       <path d={salePath()} fill="#f59e0b" fill-opacity="0.7" />
