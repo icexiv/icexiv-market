@@ -77,11 +77,11 @@ install -m 755 /opt/universalis-proxy/target/release/universalis-proxy /usr/loca
 install -m 644 deploy/universalis-proxy.service /etc/systemd/system/
 systemctl daemon-reload && systemctl enable --now universalis-proxy
 
-# Caddy：把 deploy/market-api.caddy 放到 /etc/caddy/，在 market.icexiv.top 站点块内 import market_api
+# Caddy：deploy/market-api.caddy → /etc/caddy/，顶层先 import 它，再在站点块内 import market_api
 caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
 ```
 
-前端侧只需把 `UNIVERSALIS_BASE_URL` 指到同源 `/api/universalis`（`packages/shared/src/api.ts`），线上不再由浏览器直连上游。
+前端侧通过构建变量把 API 指到同源 `/api/universalis`（`VITE_UNIVERSALIS_BASE`，见上节）；同源失败会自动回源到直连。
 
 ## 配置
 
@@ -110,6 +110,26 @@ caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
 # 代理命中：同一 URL 重复
 ./target/release/universalis-proxy bench 'http://127.0.0.1:18090/api/v2/aggregated/中国/2,3,4,5,6,7' 2000 8
 ```
+
+## 线上接入（国内站）
+
+`.github/workflows/deploy.yml` 里国内站构建（`VITE_SITE_TARGET=cn`）加了：
+
+```yaml
+VITE_UNIVERSALIS_BASE: /api/universalis
+```
+
+国际站（GitHub Pages）保持不变，仍然直连上游。`deploy-server` 在 rsync 前会先探一次同源接口，反代不可用时拒绝发布。
+
+浏览器侧有回源兜底（`packages/shared/src/api.ts`）：
+
+- 请求顺序：同源 `/api/universalis` → 直连 `https://universalis.app`；
+- 只有网络失败、超时、5xx、429，以及主地址的 404（通常是路由没配）才回源；4xx 不重试；
+- 回源后进入 60 s 冷却，期间直接走直连，避免每个请求都先撞一次坏路径；
+- 开发环境不启用回源，代理坏了要能看见；
+- `app/index.html` 的 `universalis.app` preconnect 在国内站构建时由 `vite.config.ts` 的插件移除（国际站保留）。
+
+Caddy 侧：正式站与灰度站共用 `(market_api)` 片段（`deploy/market-api.caddy`）。Caddyfile 里**必须先 import `market-api.caddy` 再 import `market-stage.caddy`**，片段嵌套展开要求被引用的片段已经定义。片段必须用 `(name) { ... }` 语法，写成 `name:` 会让后续文件的片段解析失败（实测 `File to import not found`）。
 
 ## 灰度站部署
 
@@ -201,3 +221,13 @@ CPU 始终只有 0.5–0.66 核，说明上限是回环压测端，真实值更�
 - 带宽：物品会话 6.6 KB、首页会话 20 KB；19 Mbps 出站 ≈ 2.4 MB/s，够 120–360 个会话/秒。
 - 出站限速 8/s：1 万日活、20% 未命中约 0.35 miss/s，留足余量。
 - 结论：**瓶颈不是这台机器**，是套餐月流量与上游冷路径；机器侧三个数量级余量。
+
+## 复现
+
+```bash
+# 服务器侧：资源与吞吐（代理绑 CPU1、压测绑 CPU0 时最准）
+taskset -c 0 python3 deploy/bench-suite.py idle|hits|misses|cache
+
+# 客户端：代理 vs 直连（good = 系统代理，bad = --noproxy，proxy = 灰度站）
+python3 deploy/compare.py
+```

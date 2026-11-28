@@ -15,6 +15,90 @@ import { PriceRangeStrip } from './price-range-strip'
 import { ListingTableSkeleton, ListingChartSkeleton, ChartErrorCard, ServerListingBarChart, ServerHistoryTrendChart, ServerHistoryScatterChart } from './charts'
 import { formatGil, formatDailySales, formatTime } from './format'
 
+// 挂单/成交分布图例：统计卡与图表共用同一套小图形，避免两处各写一遍。
+// 传入 onToggle 时每一项变成开关，hidden 里的系列在图上不画。
+function DistributionLegend(props: {
+  showMin?: boolean
+  class?: string
+  hidden?: ReadonlySet<string>
+  onToggle?: (key: string) => void
+}) {
+  const items = () => [
+    ...(props.showMin === false
+      ? []
+      : [{
+          key: 'min',
+          label: '最低价',
+          icon: (
+            <svg viewBox="0 0 18 10" class="h-2.5 w-[18px]" aria-hidden="true">
+              <rect x="0" y="0" width="7" height="10" rx="1" class="fill-primary" fill-opacity="0.2" />
+            </svg>
+          ),
+        }]),
+    {
+      key: 'listing',
+      label: '挂单 P25~P75',
+      icon: (
+        <svg viewBox="0 0 18 10" class="h-2.5 w-[18px]" aria-hidden="true">
+          <path d="M1 5 C5 1 13 1 17 5 C13 9 5 9 1 5 Z" class="fill-primary" fill-opacity="0.25" />
+        </svg>
+      ),
+    },
+    {
+      key: 'sale',
+      label: '成交 P25~P75',
+      icon: (
+        <svg viewBox="0 0 18 10" class="h-2.5 w-[18px]" aria-hidden="true">
+          <path d="M1 5 C5 2 13 2 17 5 C13 8 5 8 1 5 Z" class="fill-amber-500" fill-opacity="0.7" />
+        </svg>
+      ),
+    },
+    {
+      key: 'median',
+      label: '成交中位',
+      icon: (
+        <svg viewBox="0 0 18 10" class="h-2.5 w-[18px]" aria-hidden="true">
+          <line x1="9" y1="0" x2="9" y2="10" class="stroke-amber-700" stroke-width="2.5" stroke-opacity="0.5" />
+        </svg>
+      ),
+    },
+  ]
+
+  return (
+    <div class={props.class ?? 'flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground'}>
+      <For each={items()}>
+        {(item) => {
+          const hidden = () => props.hidden?.has(item.key) ?? false
+          const body = (
+            <span class={'inline-flex items-center gap-1 ' + (hidden() ? 'line-through' : '')}>
+              {item.icon}
+              {item.label}
+            </span>
+          )
+          return props.onToggle ? (
+            <ButtonPrimitive
+              type="button"
+              aria-pressed={!hidden()}
+              title={hidden() ? `显示 ${item.label}` : `隐藏 ${item.label}`}
+              onClick={() => props.onToggle!(item.key)}
+              class={
+                'inline-flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 transition-colors ' +
+                (hidden()
+                  ? 'text-muted-foreground/55 line-through hover:bg-accent/40'
+                  : 'bg-muted/60 text-muted-foreground hover:bg-accent hover:text-foreground')
+              }
+            >
+              {body}
+            </ButtonPrimitive>
+          ) : (
+            body
+          )
+        }}
+      </For>
+    </div>
+  )
+}
+
 export interface ItemReportViewProps {
   itemId: number
   item: ItemInfo
@@ -54,6 +138,17 @@ export function ItemReportView(props: ItemReportViewProps) {
     })
   })
   const [isScrolled, setIsScrolled] = createSignal(false)
+
+  // 图例开关：控制图上要画哪些系列（min / listing / sale / median），统计卡与图表共用
+  const [hiddenSeries, setHiddenSeries] = createSignal<ReadonlySet<string>>(new Set(['sale']))
+  const toggleSeries = (key: string) => {
+    setHiddenSeries((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   let sentinelRef!: HTMLDivElement
 
@@ -103,8 +198,8 @@ export function ItemReportView(props: ItemReportViewProps) {
     const lo = Math.min(...lows)
     const hi = Math.max(...highs)
     const span = hi > lo ? hi - lo : Math.max(hi * 0.1, 1)
-    // 左端留少一点：最低价就在条的最左侧
-    return { lo: Math.max(0, lo - span * 0.05), hi: hi + span * 0.18 }
+    // 左端只留出圆点半径的余量：最低价就贴着条的最左侧
+    return { lo: Math.max(0, lo - span * 0.015), hi: hi + span * 0.18 }
   })
 
   // Explicit quality never falls back based on current stock. Without a quality
@@ -157,14 +252,16 @@ export function ItemReportView(props: ItemReportViewProps) {
         aria-pressed={props.selectable ? selected() : undefined}
         onClick={() => props.selectable && handleQualityChange(props.hq ? 'hq' : 'nq')}
         class={
-          'flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-all ' +
+          'col-span-2 grid grid-cols-subgrid items-center rounded-md px-2 py-1.5 text-left transition-all ' +
           (props.selectable
             ? 'cursor-pointer hover:bg-accent/60 ' + (selected() ? '' : 'opacity-40')
             : 'cursor-default')
         }
       >
+        {/* 品质标签与最低价同属左侧一列；两行共用同一列宽，价格长短不同也不会让区间条错位 */}
+        <div class="flex items-center gap-3">
         <QualityTag hq={props.hq} class="shrink-0" />
-        <div class="w-32 shrink-0">
+        <div class="whitespace-nowrap">
           <Show when={props.minListing} fallback={<span class="text-muted-foreground">-</span>}>
             <div class="flex items-baseline gap-1">
               <span class="text-lg font-bold tracking-tight tabular-nums">
@@ -178,7 +275,8 @@ export function ItemReportView(props: ItemReportViewProps) {
             />
           </Show>
         </div>
-        <div class="min-w-0 flex-1">
+        </div>
+        <div class="min-w-0">
           <PriceRangeStrip
             min={props.dist.min}
             p25={props.dist.p25}
@@ -498,17 +596,20 @@ export function ItemReportView(props: ItemReportViewProps) {
         }
       >
         <Card class="mb-6" data-report-section="stats">
-          <CardContent class="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-0 sm:divide-x sm:divide-border">
+          <CardContent class="flex flex-col gap-3 sm:gap-2">
+            {/* 标题与图例占满整卡宽度，右边缘与下方图表卡的图例对齐 */}
+            <div class="flex items-center justify-between gap-3">
+              <span class="px-2 text-xs font-medium text-muted-foreground">最低挂单 · 挂单与成交分布</span>
+              <DistributionLegend showMin={false} class="hidden shrink-0 items-center justify-end gap-x-3 text-[10px] text-muted-foreground sm:flex" />
+            </div>
+            <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-0 sm:divide-x sm:divide-border">
             {/* 最低挂单 + 价格分布：每个品质一行，双品质时整行可点击选择 */}
             <div class="min-w-0 flex-1 sm:pr-6">
               <Show
                 when={stats()?.nqDist || stats()?.hqDist}
                 fallback={<div class="text-muted-foreground">-</div>}
               >
-                <div class="mb-1 px-2 text-xs font-medium text-muted-foreground">
-                  最低挂单 · 挂单与成交分布
-                </div>
-                <div class="space-y-1">
+                <div class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
                   <Show when={stats()?.nqDist}>
                     {(dist) => (
                       <QualityRow
@@ -577,6 +678,7 @@ export function ItemReportView(props: ItemReportViewProps) {
                 </div>
               </div>
             </div>
+            </div>
           </CardContent>
         </Card>
       </Show>
@@ -594,37 +696,8 @@ export function ItemReportView(props: ItemReportViewProps) {
               <CardTitle class="text-sm">挂单与成交分布</CardTitle>
               <CardDescription class="text-xs">各服务器挂单区间与近 30 天成交区间</CardDescription>
             </div>
-            {/* 图例：用和图表一致的小图形示意，不占表格行空间 */}
-            <div class="hidden shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 pt-0.5 text-[10px] text-muted-foreground sm:flex">
-              <span class="inline-flex items-center gap-1">
-                <svg viewBox="0 0 18 10" class="h-2.5 w-[18px]" aria-hidden="true">
-                  <rect x="0" y="0" width="7" height="10" rx="1" class="fill-primary" fill-opacity="0.14" />
-                </svg>
-                最低价
-              </span>
-              <span class="inline-flex items-center gap-1">
-                <svg viewBox="0 0 18 10" class="h-2.5 w-[18px]" aria-hidden="true">
-                  <path
-                    d="M1 5 C5 1 13 1 17 5 C13 9 5 9 1 5 Z"
-                    class="fill-muted-foreground"
-                    fill-opacity="0.3"
-                  />
-                </svg>
-                挂单 P25~P75
-              </span>
-              <span class="inline-flex items-center gap-1">
-                <svg viewBox="0 0 18 10" class="h-2.5 w-[18px]" aria-hidden="true">
-                  <path d="M1 5 C5 2 13 2 17 5 C13 8 5 8 1 5 Z" class="fill-amber-500" fill-opacity="0.55" />
-                </svg>
-                成交 P25~P75
-              </span>
-              <span class="inline-flex items-center gap-1">
-                <svg viewBox="0 0 18 10" class="h-2.5 w-[18px]" aria-hidden="true">
-                  <line x1="9" y1="0" x2="9" y2="10" class="stroke-amber-700" stroke-width="2.5" stroke-opacity="0.5" />
-                </svg>
-                成交中位
-              </span>
-            </div>
+            {/* 图例：统计卡与图表共用同一套小图形，不占表格行空间 */}
+            <DistributionLegend hidden={hiddenSeries()} onToggle={toggleSeries} class="hidden shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 pt-0.5 text-[10px] text-muted-foreground sm:flex" />
             </div>
           </CardHeader>
           <CardContent class="pt-0">
@@ -638,7 +711,7 @@ export function ItemReportView(props: ItemReportViewProps) {
                 />
               }
             >
-              <ServerListingBarChart directory={directory()} listings={filteredListings()} history={filteredHistory()} scope={scope()} historyLoading={props.history.data === undefined && !props.history.error} historyError={props.history.data === undefined && Boolean(props.history.error)} />
+              <ServerListingBarChart directory={directory()} listings={filteredListings()} history={filteredHistory()} scope={scope()} historyLoading={props.history.data === undefined && !props.history.error} historyError={props.history.data === undefined && Boolean(props.history.error)} hidden={hiddenSeries()} />
             </Show>
           </CardContent>
         </Card>

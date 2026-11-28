@@ -1,7 +1,10 @@
 # 灰度站：market-stage.icexiv.top
 #
-# 放在 /etc/caddy/market-stage.caddy，并在 Caddyfile 顶层 `import market-stage.caddy`。
-# 与正式站的区别只有两处：静态目录不同，且 /api/universalis/* 由本机 Rust 反代（缓存）提供。
+# 放在 /etc/caddy/market-stage.caddy，并在 Caddyfile 顶层 import。
+# Caddyfile 里 **先 import market-api.caddy，再 import 本文件**：片段嵌套展开要求
+# 被引用的片段已经定义（实测顺序反了会报 "File to import not found: market_api"）。
+#
+# 与正式站的区别只有静态目录与 noindex；行情接口共用 (market_api)，行为完全一致。
 
 (market_stage) {
 	encode zstd gzip
@@ -19,22 +22,7 @@
 	@html path / /index.html /render.html
 	header @html Cache-Control "public, max-age=0, must-revalidate"
 
-	# 前端构建时 VITE_UNIVERSALIS_BASE=/api/universalis，这里把前缀剥掉交给缓存服务
-	handle_path /api/universalis/* {
-		@allowed path /api/v2/*
-		handle @allowed {
-			reverse_proxy 127.0.0.1:18090 {
-				header_up X-Forwarded-For {remote_host}
-			}
-		}
-		handle {
-			respond 404
-		}
-	}
-
-	handle /api/* {
-		respond 404
-	}
+	import market_api
 
 	handle /items/* {
 		file_server

@@ -2,12 +2,13 @@ import { createMemo, createSignal, createEffect, Show, For, onCleanup } from 'so
 import { getDcColorHex, type WorldDirectory } from '@xiv-market/shared'
 import { Card, CardContent, CardHeader } from '../card'
 import { Button } from '../button'
+import { Root as ButtonPrimitive } from '@kobalte/core/button'
 import { Skeleton } from '../skeleton'
 import { EmptyState } from '../empty-state'
 import { RefreshButton } from '../refresh-button'
 import { Tooltip, TooltipPortal, TooltipTrigger, TooltipContent } from '../tooltip'
 import { formatGil, formatAxisGil, formatDailySales, formatTime } from './format'
-import { PROFILE_HEIGHT, PROFILE_CENTER, PROFILE_BINS, rangeBins, profilePath } from './profile'
+import { PROFILE_HEIGHT, PROFILE_CENTER, PROFILE_BINS, PROFILE_ROW_MIN_HALF, PROFILE_ROW_MAX_HALF, rangeBins, profilePath } from './profile'
 
 type ChartConstructor = typeof import('chart.js/auto').default
 
@@ -238,6 +239,9 @@ function ChartLoadError(props: { onRetry: () => void }) {
 
 type SalesTrend = 'up' | 'down' | 'flat'
 
+// 行内波形厚度：整高的 20%~50%
+const ROW_LIMITS = { minHalf: PROFILE_ROW_MIN_HALF, maxHalf: PROFILE_ROW_MAX_HALF }
+
 function computeSalesVelocityByServer(history: any[]) {
   const daySeconds = 24 * 60 * 60
   const windowDays = 7
@@ -297,9 +301,36 @@ function SalesTrendIcon(props: { trend: SalesTrend }) {
   return <span class="inline-block size-3.5 shrink-0 text-center text-muted-foreground" aria-label="销量持平">-</span>
 }
 
-export function ServerListingBarChart(props: { directory: WorldDirectory; listings: any[]; history: any[]; scope: string; historyLoading: boolean; historyError?: boolean }) {
+export function ServerListingBarChart(props: {
+  directory: WorldDirectory
+  listings: any[]
+  history: any[]
+  scope: string
+  historyLoading: boolean
+  historyError?: boolean
+  /** 图例开关：hidden 里的系列不画（min / listing / sale / median） */
+  hidden?: ReadonlySet<string>
+}) {
   const { getChartGroupName, getChartGroupOrder, getChartGroupColor, computeStats, getDcNameByWorldName } = createChartHelpers(() => props.directory)
   const [hideOutliers, setHideOutliers] = createSignal(true)
+  // 排序：升序 → 降序 → 取消。成交中位缺失的行始终排最后。
+  const [sortMode, setSortMode] = createSignal<null | { key: 'min' | 'sale'; dir: 'asc' | 'desc' }>(null)
+  const toggleSort = (key: 'min' | 'sale') => {
+    const current = sortMode()
+    if (!current || current.key !== key) setSortMode({ key, dir: 'asc' })
+    else if (current.dir === 'asc') setSortMode({ key, dir: 'desc' })
+    else setSortMode(null)
+  }
+  // 点图例隐藏/显示某个分组（大区）；只影响画哪些行，坐标轴仍按全部服务器算
+  const [hiddenGroups, setHiddenGroups] = createSignal<ReadonlySet<string>>(new Set())
+  const toggleGroup = (group: string) => {
+    setHiddenGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(group)) next.delete(group)
+      else next.add(group)
+      return next
+    })
+  }
 
   // 图表列的像素宽度：决定 P25~P75 直方图用几个桶（每桶至少 ~8px，窄区间不再挤成噪点）
   const [chartWidth, setChartWidth] = createSignal(0)
@@ -404,6 +435,21 @@ export function ServerListingBarChart(props: { directory: WorldDirectory; listin
         saleP75: saleQuantile(0.75),
       }
     })
+    const sort = sortMode()
+    if (sort) {
+      const direction = sort.dir === 'asc' ? 1 : -1
+      data.sort((a, b) => {
+        const aValue = sort.key === 'min' ? a.min : a.saleP50
+        const bValue = sort.key === 'min' ? b.min : b.saleP50
+        // 没有成交的服务器不参与成交中位排序，永远沉底
+        const aMissing = !(aValue > 0)
+        const bMissing = !(bValue > 0)
+        if (aMissing !== bMissing) return aMissing ? 1 : -1
+        if (aMissing) return a.server.localeCompare(b.server)
+        return (aValue - bValue) * direction
+      })
+    }
+
     const maxPrice = data.length > 0 ? Math.max(...data.map((d) => d.max)) : 0
 
     const mins = data.map((d) => d.min).filter((v) => v > 0)
@@ -425,6 +471,12 @@ export function ServerListingBarChart(props: { directory: WorldDirectory; listin
       fullMin: 0,
       fullMax: maxPrice,
     }
+  })
+
+  const visibleRows = createMemo(() => {
+    const hidden = hiddenGroups()
+    const rows = serverData().data
+    return hidden.size ? rows.filter((row) => !hidden.has(getChartGroupName(props.scope, row.server))) : rows
   })
 
   const valuePct = (value: number) => {
@@ -478,6 +530,37 @@ export function ServerListingBarChart(props: { directory: WorldDirectory; listin
     const groups = Array.from(new Set(serverData().data.map((item) => getChartGroupName(props.scope, item.server))))
     return getChartGroupOrder(props.scope, groups)
   })
+
+  // 表头排序：点击切 升序 → 降序 → 取消，和 shadcn DataTable 的表头排序一致
+  const SortHeader = (props: { sortKey: 'min' | 'sale'; label: string }) => {
+    const dir = () => (sortMode()?.key === props.sortKey ? sortMode()!.dir : null)
+    return (
+      // 外层的 padding 与数据单元格一致，保证表头文字和数字右边缘对齐
+      <span class="block rounded px-0.5 py-0.5 text-right">
+      <ButtonPrimitive
+        type="button"
+        onClick={() => toggleSort(props.sortKey)}
+        title={dir() === 'asc' ? '降序排列' : dir() === 'desc' ? '取消排序' : '升序排列'}
+        class="group inline-flex items-center gap-1 whitespace-nowrap tabular-nums text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <Show
+          when={dir()}
+          fallback={
+            <svg viewBox="0 0 24 24" class="size-3 shrink-0 opacity-40 transition-opacity group-hover:opacity-80" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M8 9l4-4 4 4" />
+              <path d="M16 15l-4 4-4-4" />
+            </svg>
+          }
+        >
+          <svg viewBox="0 0 24 24" class="size-3 shrink-0 text-foreground" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d={dir() === 'asc' ? 'M12 19V5M5 12l7-7 7 7' : 'M12 5v14M5 12l7 7 7-7'} />
+          </svg>
+        </Show>
+        {props.label}
+      </ButtonPrimitive>
+      </span>
+    )
+  }
 
   const Axis = (props: { position: 'top' | 'bottom' }) => (
     <div
@@ -533,8 +616,18 @@ export function ServerListingBarChart(props: { directory: WorldDirectory; listin
             <For each={legendGroups()}>
               {(group) => {
                 const color = getChartGroupColor(props.scope, group)
+                const hidden = () => hiddenGroups().has(group)
                 return (
-                  <span class="inline-flex items-center gap-1.5 whitespace-nowrap">
+                  <ButtonPrimitive
+                    type="button"
+                    aria-pressed={!hidden()}
+                    title={hidden() ? `显示 ${group}` : `隐藏 ${group}`}
+                    onClick={() => toggleGroup(group)}
+                    class={
+                      'inline-flex items-center gap-1.5 whitespace-nowrap rounded px-1 py-0.5 transition-all hover:bg-accent/60 ' +
+                      (hidden() ? 'opacity-35' : '')
+                    }
+                  >
                     <span
                       class="size-2.5 rounded-[2px] border"
                       style={{
@@ -543,13 +636,14 @@ export function ServerListingBarChart(props: { directory: WorldDirectory; listin
                       }}
                       aria-hidden="true"
                     />
-                    <span>{group}</span>
-                  </span>
+                    <span class={hidden() ? 'line-through' : ''}>{group}</span>
+                  </ButtonPrimitive>
                 )
               }}
             </For>
           </div>
         </Show>
+        <div class="flex flex-wrap items-center gap-3">
         <label class="inline-flex items-center gap-2 cursor-pointer select-none">
           <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
             忽略异常高价
@@ -589,14 +683,15 @@ export function ServerListingBarChart(props: { directory: WorldDirectory; listin
             />
           </button>
         </label>
+        </div>
       </div>
 
       {/* 统一 grid：表头和数据在同一个 grid 中，列宽全局一致 */}
       <div class="overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6">
         <div class="grid grid-cols-[minmax(4.5rem,auto)_minmax(4.5rem,auto)_max-content_auto_max-content_minmax(3.5rem,auto)_minmax(12rem,1fr)_minmax(3.5rem,auto)_minmax(5.5rem,auto)_minmax(5rem,auto)] gap-x-2 sm:gap-x-3 gap-y-1 text-xs px-0.5 min-w-[790px]">
         {/* 表头 */}
-        <span class="text-right tabular-nums whitespace-nowrap text-muted-foreground">最低价</span>
-        <span class="text-right tabular-nums whitespace-nowrap text-muted-foreground">中位成交价</span>
+        <SortHeader sortKey="min" label="最低价" />
+        <SortHeader sortKey="sale" label="中位成交价" />
         <span class="col-span-3 grid grid-cols-subgrid gap-x-1 tabular-nums whitespace-nowrap text-muted-foreground">
           <span class="text-right">P25</span>
           <span class="text-center">~</span>
@@ -609,7 +704,7 @@ export function ServerListingBarChart(props: { directory: WorldDirectory; listin
         <span class="text-right whitespace-nowrap text-muted-foreground">上次更新</span>
 
         {/* 数据行：display: contents 让子元素直接参与父级 grid */}
-        <For each={serverData().data}>
+        <For each={visibleRows()}>
           {(item) => {
             const listingPct = valuePct(item.min)
             const p25Pct = valuePct(item.p25)
@@ -622,12 +717,12 @@ export function ServerListingBarChart(props: { directory: WorldDirectory; listin
             // 桶数跟着区间像素宽度走，窄区间用更少的桶，形状看得清而不是一根根毛刺。
             const listingPath = createMemo(() => {
               const bins = rangeBins(item.listingPoints, p25Pct, p75Pct, valuePct, binCountFor(p25Pct, p75Pct))
-              return profilePath(bins, p25Pct, p75Pct, 2 / 3, 'down')
+              return profilePath(bins, p25Pct, p75Pct, 2 / 3, 'down', ROW_LIMITS)
             })
             const salePath = createMemo(() => {
               if (!(item.saleP25 > 0)) return ''
               const bins = rangeBins(item.salePoints, saleLo, saleHi, valuePct, binCountFor(saleLo, saleHi))
-              return bins.length ? profilePath(bins, saleLo, saleHi, 2 / 3, 'up') : ''
+              return bins.length ? profilePath(bins, saleLo, saleHi, 2 / 3, 'up', ROW_LIMITS) : ''
             })
             return (
               <div class="contents group cursor-pointer">
@@ -660,22 +755,25 @@ export function ServerListingBarChart(props: { directory: WorldDirectory; listin
                     aria-hidden="true"
                   >
                     {/* 最低价：极淡底色只交代大区归属，色块右边缘就是最低价位置 */}
-                    <rect
-                      x="0"
-                      y="0"
-                      width={Math.max(listingPct, 0.6)}
-                      height={PROFILE_HEIGHT}
-                      fill={color.solid}
-                      fill-opacity="0.14"
-                    />
-                    <Show when={listingPath()}>
-                      <path d={listingPath()} class="fill-muted-foreground" fill-opacity="0.3" />
+                    <Show when={!props.hidden?.has('min')}>
+                      <rect
+                        x="0"
+                        y="0"
+                        width={Math.max(listingPct, 0.6)}
+                        height={PROFILE_HEIGHT}
+                        fill={color.solid}
+                        fill-opacity="0.5"
+                      />
                     </Show>
-                    <Show when={salePath()}>
-                      <path d={salePath()} fill="#f59e0b" fill-opacity="0.55" />
+                    <Show when={listingPath() && !props.hidden?.has('listing')}>
+                      {/* 挂单波形用该服务器所在大区的颜色，浅填充；成交仍是琥珀色 */}
+                      <path d={listingPath()} fill={color.solid} fill-opacity="0.25" />
+                    </Show>
+                    <Show when={salePath() && !props.hidden?.has('sale')}>
+                      <path d={salePath()} fill="#f59e0b" fill-opacity="0.7" />
                     </Show>
                     {/* 中位刻度：固定行高 2/3，以基线为中心（只标成交中位） */}
-                    <Show when={saleMedianPct != null}>
+                    <Show when={saleMedianPct != null && !props.hidden?.has('median')}>
                       <line
                         x1={saleMedianPct!}
                         y1={PROFILE_CENTER - PROFILE_HEIGHT / 3}

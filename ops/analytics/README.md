@@ -4,7 +4,7 @@
 
 ## 采集与保留
 
-- 只采集 `market.icexiv.top` 域名入口的请求，不包含直接访问 IP、报表自身、GitHub Pages 或浏览器直连 Universalis / TOS 的请求。
+- 只采集 `market.icexiv.top` 域名入口的请求，不包含直接访问 IP、报表自身、GitHub Pages 的请求。国内站的行情接口自 2026-11-28 起走同源 `/api/universalis/*`，这部分会进入日志并计入报表；国际站仍由浏览器直连 Universalis / TOS，不计入。
 - Caddy JSON 日志：`/var/log/caddy/market-access.log`。单文件 20 MiB，最多保留 10 个轮转文件，轮转文件保留不超过 30 天；当前文件不按时间轮转，因此低流量下可能包含更早的请求。文件不压缩，供 GoAccess 根据 inode / 偏移量增量读取，避免重复计数和漏读轮转文件。
 - 原始日志包含 IP、路径和 User-Agent，文件权限为 `0640`，`/var/log/caddy` 为 `0750 caddy:caddy`；轮转继承文件权限。Caddy 的 systemd drop-in 设置 `UMask=0027`，用于进程下次启动后创建的文件；部署时也需收紧已有日志的权限。GoAccess 报表对 IP 脱敏、合并同路径的查询参数，不查询外部 DNS 或 GeoIP 服务。
 - 报表保留最近 30 天的统计，每 5 分钟更新一次（额外最多约 25 秒调度偏移）。包含爬虫及静态资源；访客数按 IP、User-Agent 和日期估算，不代表精确人数或页面浏览量。

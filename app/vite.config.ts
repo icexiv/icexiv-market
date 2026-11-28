@@ -1,10 +1,10 @@
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { execSync } from 'child_process'
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import solid from 'vite-plugin-solid'
 import tailwindcss from '@tailwindcss/vite'
-import { resolveSiteTarget } from './site-target'
+import { resolveSiteTarget, type SiteTarget } from './site-target'
 import { medamaAnalytics } from './analytics'
 import { createEnvProxyAgent } from './proxy-agent'
 
@@ -23,13 +23,24 @@ const itemsSource = JSON.parse(readFileSync(new URL('./.generated/items-source.j
 const gitCommit = getGitInfo()
 const base = (process.env.BASE_URL || '/').replace(/\/?$/, '/')
 
+/** 国内站的行情走同源 /api/universalis，不需要预连上游；国际站仍然直连，保留预连。 */
+function stripUniversalisPreconnect(siteTarget: SiteTarget): Plugin {
+  return {
+    name: 'strip-universalis-preconnect',
+    transformIndexHtml(html) {
+      if (siteTarget !== 'cn') return html
+      return html.replace(/\s*<link rel="preconnect" href="https:\/\/universalis\.app" \/>/, '')
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), 'VITE_SITE_TARGET')
   const siteTarget = resolveSiteTarget(env.VITE_SITE_TARGET)
 
   return {
     base,
-    plugins: [solid(), tailwindcss(), medamaAnalytics(siteTarget, mode)],
+    plugins: [solid(), tailwindcss(), medamaAnalytics(siteTarget, mode), stripUniversalisPreconnect(siteTarget)],
     build: {
       rolldownOptions: {
         input: {

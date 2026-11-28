@@ -10,6 +10,17 @@ export interface JsonRequestOptions {
   sha256?: string
 }
 
+/** 上游返回非 2xx；保留状态码，供调用方判断是否值得换地址重试。 */
+export class HttpError extends Error {
+  readonly status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'HttpError'
+    this.status = status
+  }
+}
+
 function abortWithReason(controller: AbortController, reason: unknown) {
   if (reason === undefined) controller.abort()
   else controller.abort(reason)
@@ -47,7 +58,7 @@ export async function fetchJsonWithTimeout<T>(
     trace.waitMs = performance.now() - trace.start
     if (!res.ok) {
       await res.body?.cancel().catch(() => {})
-      throw new Error(`${errorMessage}（HTTP ${res.status}）`)
+      throw new HttpError(res.status, `${errorMessage}（HTTP ${res.status}）`)
     }
     const readStart = performance.now()
     const bytes = await res.arrayBuffer()

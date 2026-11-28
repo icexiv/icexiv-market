@@ -9,7 +9,7 @@ TARGET="/srv/market-stage.icexiv.top/www"
 
 cd "$ROOT"
 
-# 灰度站把 API 指到同源反代；正式站仍然编译成直连 universalis.app
+# 灰度站与正式站都编译成同源 /api/universalis；这里只是把产物发到灰度目录
 VITE_SITE_TARGET=cn \
 VITE_UNIVERSALIS_BASE=/api/universalis \
 BASE_URL=/ \

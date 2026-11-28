@@ -4,8 +4,11 @@
 export const PROFILE_HEIGHT = 16
 export const PROFILE_BINS = 16
 export const PROFILE_CENTER = PROFILE_HEIGHT / 2
-// 空桶也留一点厚度，保证整块不被拆开
+// 空桶留一点厚度，保证整块不被拆开（统计卡沿用这个默认值）
 export const PROFILE_MIN_HALF = 0.4
+// 行内图专用：厚度限制在整高的 20%~50%，不贴边也不消失
+export const PROFILE_ROW_MIN_HALF = PROFILE_HEIGHT * 0.1
+export const PROFILE_ROW_MAX_HALF = PROFILE_HEIGHT * 0.25
 
 export type PricePoint = { price: number; quantity: number }
 
@@ -38,11 +41,13 @@ export function profilePath(
   hiPct: number,
   amplitude: number,
   side: 'both' | 'up' | 'down' = 'both',
+  limits: { minHalf?: number; maxHalf?: number } = {},
 ): string {
   const max = Math.max(...bins, 0)
-  const top = PROFILE_CENTER * amplitude
+  const minHalf = limits.minHalf ?? PROFILE_MIN_HALF
+  const top = Math.min(PROFILE_CENTER * amplitude, limits.maxHalf ?? Number.POSITIVE_INFINITY)
   const half = (v: number) =>
-    max > 0 ? PROFILE_MIN_HALF + (top - PROFILE_MIN_HALF) * Math.sqrt(v / max) : PROFILE_MIN_HALF
+    max > 0 ? minHalf + (top - minHalf) * Math.sqrt(v / max) : minHalf
   const span = Math.max(hiPct - loPct, 0.5)
   const count = bins.length
   const step = span / count

@@ -103,6 +103,9 @@ jobs:
         env:
           VITE_SITE_TARGET: cn
           BASE_URL: /
+          # 国内站走源站自己的 Rust 缓存反代（market.icexiv.top/api/universalis/*）。
+          # 国际站在 GitHub Pages 上没有这个后端，保持直连 universalis.app。
+          VITE_UNIVERSALIS_BASE: /api/universalis
 
       - name: Upload server artifact
         uses: actions/upload-artifact@v4
@@ -132,6 +135,12 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Check same-origin API before deploying
+        # 国内站构建成同源 /api/universalis，反代不可用时不要发布新产物
+        run: |
+          curl -fsS --max-time 15 -o /dev/null \
+            https://market.icexiv.top/api/universalis/api/v2/data-centers
 
       - name: Deploy to market.icexiv.top
         run: |

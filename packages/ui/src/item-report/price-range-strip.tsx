@@ -17,6 +17,8 @@ export function PriceRangeStrip(props: {
   saleP25?: number
   saleP50?: number
   saleP75?: number
+  /** 图例开关：hidden 里的系列不画（min / listing / sale / median） */
+  hidden?: ReadonlySet<string>
 }) {
   const spanOf = (lo: number, hi: number) => (hi > lo ? hi - lo : Math.max(hi * 0.1, 1))
 
@@ -28,8 +30,8 @@ export function PriceRangeStrip(props: {
     const lo = Math.min(...lows)
     const hi = Math.max(...highs)
     const span = spanOf(lo, hi)
-    // 左端只需要一点点余量：最低价本身就在条的最左边，留太多会显得空
-    return { lo: Math.max(0, lo - span * 0.05), hi: hi + span * 0.18 }
+    // 左端只留出圆点半径的余量：最低价就贴着条的最左边，留多了整段都是空的
+    return { lo: Math.max(0, lo - span * 0.015), hi: hi + span * 0.18 }
   })
   const pct = (v: number) =>
     Math.min(100, Math.max(0, ((v - domain().lo) / (domain().hi - domain().lo)) * 100))
@@ -180,6 +182,7 @@ export function PriceRangeStrip(props: {
   return (
     <div ref={rootRef} data-layout-ready={stripWidth() > 0 ? "true" : "false"}>
       {/* 成交标签在上，挂单标签（含最低价）在下 */}
+      <Show when={!props.hidden?.has('sale')}>
       <div class="relative mb-1.5 h-6">
         <For each={topLabels()}>
           {(l) => (
@@ -193,6 +196,7 @@ export function PriceRangeStrip(props: {
           )}
         </For>
       </div>
+      </Show>
       <div class="relative h-4 rounded-sm bg-muted/30">
         <svg
           viewBox={`0 0 100 ${PROFILE_HEIGHT}`}
@@ -201,7 +205,7 @@ export function PriceRangeStrip(props: {
           aria-hidden="true"
         >
           {/* 挂单 P25~P75 整块 */}
-          <Show when={props.listingPoints && props.listingPoints.length > 0}>
+          <Show when={props.listingPoints && props.listingPoints.length > 0 && !props.hidden?.has('listing')}>
             <path
               d={profilePath(rangeBins(props.listingPoints!, pct(props.p25), pct(props.p75), pct), pct(props.p25), pct(props.p75), 2 / 3, 'down')}
               class="fill-primary stroke-primary"
@@ -212,7 +216,7 @@ export function PriceRangeStrip(props: {
             />
           </Show>
           {/* 成交 P25~P75：实心琥珀，半幅 */}
-          <Show when={props.salePoints && props.salePoints.length > 0 && props.saleP25 != null && props.saleP75 != null && props.saleP75! > 0}>
+          <Show when={props.salePoints && props.salePoints.length > 0 && props.saleP25 != null && props.saleP75 != null && props.saleP75! > 0 && !props.hidden?.has('sale')}>
             <path
               d={profilePath(
                 rangeBins(props.salePoints!, pct(props.saleP25!), pct(props.saleP75!), pct),
@@ -228,17 +232,19 @@ export function PriceRangeStrip(props: {
             />
           </Show>
           {/* P50 刻度 */}
-          <line
-            x1={pct(props.p50)}
-            y1={PROFILE_HEIGHT / 2 - 5}
-            x2={pct(props.p50)}
-            y2={PROFILE_HEIGHT / 2 + 5}
-            class="stroke-primary"
-            stroke-width="1.5"
-            stroke-dasharray="2 2"
-            vector-effect="non-scaling-stroke"
-          />
-          <Show when={props.saleP50 != null && props.saleP50 > 0}>
+          <Show when={!props.hidden?.has('listing')}>
+            <line
+              x1={pct(props.p50)}
+              y1={PROFILE_HEIGHT / 2 - 5}
+              x2={pct(props.p50)}
+              y2={PROFILE_HEIGHT / 2 + 5}
+              class="stroke-primary"
+              stroke-width="1.5"
+              stroke-dasharray="2 2"
+              vector-effect="non-scaling-stroke"
+            />
+          </Show>
+          <Show when={props.saleP50 != null && props.saleP50 > 0 && !props.hidden?.has('median')}>
             <line
               x1={pct(props.saleP50!)}
               y1={PROFILE_HEIGHT / 2 - 5}
@@ -252,7 +258,7 @@ export function PriceRangeStrip(props: {
           </Show>
         </svg>
         {/* 最低挂单用点：统计卡里只比位置，不比长度 */}
-        <Show when={props.min != null && props.min > 0}>
+        <Show when={props.min != null && props.min > 0 && !props.hidden?.has('min')}>
           <div
             class="absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary ring-2 ring-card"
             style={{ left: `${pct(props.min!)}%` }}
@@ -260,8 +266,9 @@ export function PriceRangeStrip(props: {
           />
         </Show>
       </div>
+      <Show when={!props.hidden?.has('listing')}>
       <div class="relative mt-1.5 h-6">
-        <Show when={minLabel()}>
+        <Show when={props.hidden?.has('min') ? null : minLabel()}>
           {(label) => (
             <span
               class="absolute top-0 flex flex-col items-center gap-0.5 whitespace-nowrap leading-none tabular-nums"
@@ -285,6 +292,7 @@ export function PriceRangeStrip(props: {
           )}
         </For>
       </div>
+      </Show>
     </div>
   )
 }
