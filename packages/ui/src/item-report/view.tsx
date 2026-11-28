@@ -692,7 +692,8 @@ export function ItemReportView(props: ItemReportViewProps) {
         <Card class="mb-6 overflow-hidden py-3" data-report-section="listing-distribution">
           <CardHeader class="pb-2">
             <div class="flex flex-row items-start justify-between gap-4">
-            <div>
+            {/* 标题与说明保持 CardHeader 自身的 1.5 行距，避免被外层 flex 折叠 */}
+            <div class="grid gap-1.5">
               <CardTitle class="text-sm">挂单与成交分布</CardTitle>
               <CardDescription class="text-xs">各服务器挂单区间与近 30 天成交区间</CardDescription>
             </div>
